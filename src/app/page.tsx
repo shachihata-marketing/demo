@@ -131,11 +131,12 @@ const StampCollectionAnimation: React.FC<{
     <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
       <motion.div
         initial={{ scale: 1.5, y: -100, rotate: -45 }}
-        animate={[
-          { scale: 1.5, y: -100, rotate: -45, transition: { duration: 0.5 } },
-          { scale: 1.2, y: 0, rotate: -45, transition: { duration: 0.3 } },
-          { scale: 1, y: 0, rotate: 0, transition: { duration: 0.2, type: 'spring' } },
-        ]}
+        animate={{
+          scale: [1.5, 1.2, 1],
+          y: [-100, 0, 0],
+          rotate: [-45, -45, 0],
+          transition: { duration: 1, times: [0, 0.6, 1] },
+        }}
         exit={{ scale: 0, opacity: 0 }}
         onAnimationComplete={onComplete}
         className='relative'>
@@ -153,8 +154,8 @@ const DownloadIcon = () => (
   </svg>
 );
 
-const MicIcon = () => (
-  <svg className='w-8 h-8' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+const MicIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
     <path
       strokeLinecap='round'
       strokeLinejoin='round'
@@ -164,8 +165,8 @@ const MicIcon = () => (
   </svg>
 );
 
-const StopIcon = () => (
-  <svg className='w-8 h-8' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+const StopIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
     <rect x='6' y='6' width='12' height='12' stroke='currentColor' strokeWidth={2} />
   </svg>
 );
