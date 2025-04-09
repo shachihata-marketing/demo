@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  min-height: 100vh;
+  color: #000000;
+  background: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#__next {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+@keyframes stampEffect {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-stamp {
+  animation: stampEffect 0.5s ease-out;
+}
