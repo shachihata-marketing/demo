@@ -1,31 +1,63 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 const efp2ModuleUrl =
   "https://websdk-v2-cdn.evixar.com/sdk/efpkit2/1.0/efpkit2.js" // FingerPrint SDK CDNのURL
 const fpUrl =
-  "https://websdk-v2-cdn.evixar.com/fingerprint/shachihata_test/2/packed.db" // FingerPrintデータのURL
+  "https://websdk-v2-cdn.evixar.com/fingerprint/shachihata_test/5/packed.db" // FingerPrintデータのURL
 
 // 以下は変更しないでください。
 let stream: MediaStream | null = null
 let audioContext: AudioContext | null = null
 let audioSampleRate: number | null = null
 let recognier: Recognizer | null = null
+
 export const useEFP2 = (apiKey: string) => {
   const [meta, setMeta] = useState<string | null>(null)
   const [isRec, setIsRec] = useState(false)
+  const [micPermission, setMicPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt')
+  const [error, setError] = useState<string | null>(null)
+
+  // マイク権限の確認
+  useEffect(() => {
+    const checkMicPermission = async () => {
+      try {
+        const result = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        setMicPermission(result.state)
+        
+        result.addEventListener('change', () => {
+          setMicPermission(result.state)
+        })
+      } catch (error) {
+        console.error("マイク権限の確認エラー:", error)
+        setError("マイクの権限を確認できませんでした")
+      }
+    }
+
+    checkMicPermission()
+  }, [])
 
   const handleSwitchRec = async () => {
-    if (isRec) {
-      recordStop()
-    } else {
-      recordStart()
+    try {
+      if (isRec) {
+        await recordStop()
+      } else {
+        if (micPermission === 'denied') {
+          setError('マイクの使用が許可されていません。ブラウザの設定から許可してください。')
+          return
+        }
+        await recordStart()
+      }
+    } catch (error) {
+      console.error("音声認識エラー:", error)
+      setError("音声認識の開始/停止に失敗しました")
+      setIsRec(false)
     }
   }
 
   async function recordStart() {
     const userMedia = navigator.mediaDevices.getUserMedia
     if (userMedia == null) {
-      console.error("getUserMedia is not supported")
+      setError("getUserMediaがサポートされていません")
       return
     }
 
@@ -46,32 +78,42 @@ export const useEFP2 = (apiKey: string) => {
       audioConfig.noiseSuppression = true
     }
 
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: false,
-      audio: audioConfig,
-    })
     try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: audioConfig,
+      })
       await handleMediaDevicesOpened(mediaStream)
       console.log("audio stream on")
       setMeta(null)
       setIsRec(true)
-    } catch {
-      console.log("audio stream failed")
+      setError(null)
+    } catch (error) {
+      console.error("audio stream failed:", error)
+      setError("音声ストリームの開始に失敗しました")
+      throw error
     }
   }
 
   function recordStop() {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop())
-      audioContext?.close()
+    try {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop())
+        audioContext?.close()
 
-      stream = null
-      audioContext = null
-      audioSampleRate = null
-      recognier = null
+        stream = null
+        audioContext = null
+        audioSampleRate = null
+        recognier = null
+      }
+      console.log("audio stream off")
+      setIsRec(false)
+      setError(null)
+    } catch (error) {
+      console.error("audio stream stop failed:", error)
+      setError("音声ストリームの停止に失敗しました")
+      throw error
     }
-    console.log("audio stream off")
-    setIsRec(false)
   }
 
   const handleMediaDevicesOpened = async (_stream: MediaStream) => {
@@ -99,7 +141,7 @@ export const useEFP2 = (apiKey: string) => {
     }
   }
 
-  return { meta, isRec, handleSwitchRec }
+  return { meta, isRec, handleSwitchRec, micPermission, error }
 }
 
 async function importEFP2() {
