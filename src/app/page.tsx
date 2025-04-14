@@ -11,24 +11,30 @@ import type { User } from '@supabase/auth-helpers-nextjs';
 // スタンプの定義
 const STAMPS = [
   // 1行目
-  { id: 1, name: '栄町', image: '/images/stamps/1_sakaemachi.jpg', meta: 'sakaemachi' },
-  { id: 2, name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashioote' },
-  { id: 3, name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'oosone' },
-  { id: 10, name: 'グリーンシティ', image: '/images/stamps/10_greencity.jpeg', meta: 'greencity' },
+  { id: 1, name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
+  { id: 2, name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
+
+  { id: 3, name: '栄町', image: '/images/stamps/1_sakaemachi.jpg', meta: 'sakaemachi' },
+  { id: 4, name: '大森・金城学院前', image: '/images/stamps/5_oomori_kinjougakuinmae.jpg', meta: 'omorikinjogakuinmae' },
+  { id: 5, name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
+  { id: 6, name: '尾張瀬戸', image: '/images/stamps/8_owariseto.jpg', meta: 'owariseto' },
+
+  { id: 7, name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
+  { id: 8, name: '瀬戸市役所前', image: '/images/stamps/10_greencity.jpeg', meta: 'setoshiyakushomae' },
+  { id: 9, name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
+  { id: 10, name: 'プラットフォーム放送音', image: '/images/stamps/9_setokura.JPG', meta: 'platform' },
+  { id: 11, name: '発車ベル音', image: '/images/stamps/9_setokura.JPG', meta: 'bell' },
   // 2行目
-  { id: 4, name: '北山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
-  { id: 5, name: '大森・金城学院前', image: '/images/stamps/5_oomori_kinjougakuinmae.jpg', meta: 'oomori_kinjougakuinmae' },
-  { id: 6, name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
-  { id: 9, name: '瀬戸口', image: '/images/stamps/9_setokura.JPG', meta: 'setokura' },
+  { id: 12, name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
+  { id: 13, name: 'Asumi_赤い電車_君とせとでん', image: '/images/stamps/9_setokura.JPG', meta: 'asumi_kimitosetoden' },
   // 3行目
-  { id: 7, name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
-  { id: 8, name: '尾張瀬戸', image: '/images/stamps/8_owariseto.jpg', meta: 'owariseto' },
 ];
 
 export default function Home() {
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const APIKEY = 'XXBU6d12wboOvdLX4tVjY4IaXJpkkIi0BS3rDAqH+A4vdGG4ZEeL5XrbAnwicrQoN1CY8UzcQiU5G2sym6owH70dcQPiIyn6CwPC2Wi8Fr4=';
+  const APIKEY =
+    'C8w5IdiLDykjCe2Y3kESlzpvFtPxSOyX7wlqJTllFdKHy02IGNmVwMerhQJD6S8ek0zueOdaLEpnL5u25WqYZb5516tGVZcGUrJcgRL6s1veg8d8t7izQqToN/wlbNi1oQNInwTy8KXFgnKxbfsd+cYYQks9JGttFQeY2WiEtZvS/+N4HNVn2u/GZGHOUAv+0oukh1L7gMLxwy6mFGPWbzu6AGUUJjr8rTkWzDuPmuHLEnU1DW+lfI5yQeVfuIab';
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
