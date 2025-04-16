@@ -11,22 +11,17 @@ import type { User } from '@supabase/auth-helpers-nextjs';
 // スタンプの定義
 const STAMPS = [
   // 1行目
-  { id: 1, name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
-  { id: 2, name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
-
-  { id: 3, name: '栄町', image: '/images/stamps/1_sakaemachi.jpg', meta: 'sakaemachi' },
-  { id: 4, name: '大森・金城学院前', image: '/images/stamps/5_oomori_kinjougakuinmae.jpg', meta: 'omorikinjogakuinmae' },
-  { id: 5, name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
-  { id: 6, name: '尾張瀬戸', image: '/images/stamps/8_owariseto.jpg', meta: 'owariseto' },
-
-  { id: 7, name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
+  { id: 1, name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'sakaemachi' },
+  { id: 2, name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
+  { id: 3, name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
+  { id: 4, name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
+  { id: 5, name: '大森・金城学院前', image: '/images/stamps/5_oomori_kinjougakuinmae.jpg', meta: 'omorikinjogakuinmae' },
+  { id: 6, name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
+  { id: 7, name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
   { id: 8, name: '瀬戸市役所前', image: '/images/stamps/10_greencity.jpeg', meta: 'setoshiyakushomae' },
-  { id: 9, name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
-  { id: 10, name: 'プラットフォーム放送音', image: '/images/stamps/9_setokura.JPG', meta: 'platform' },
-  { id: 11, name: '発車ベル音', image: '/images/stamps/9_setokura.JPG', meta: 'bell' },
+  { id: 9, name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
+  { id: 10, name: 'Asumi_赤い電車_君とせとでん', image: '/images/stamps/9_setokura.JPG', meta: 'asumi_kimitosetoden' },
   // 2行目
-  { id: 12, name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
-  { id: 13, name: 'Asumi_赤い電車_君とせとでん', image: '/images/stamps/9_setokura.JPG', meta: 'asumi_kimitosetoden' },
   // 3行目
 ];
 
@@ -142,7 +137,7 @@ export default function Home() {
     <div className='min-h-screen bg-blue-50 flex flex-col'>
       {/* ヘッダー部分 */}
       <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl'>
-        <Image src='/images/logo.png' alt='logo' width={120} height={120} className='object-contain hover:scale-105 transition-transform' />
+        <Image src='/images/logo.png' alt='logo' width={240} height={240} className='object-contain hover:scale-105 transition-transform' />
       </header>
 
       {/* メインコンテンツ */}
@@ -243,6 +238,18 @@ export default function Home() {
 
       {/* スタンプ獲得アニメーション */}
       <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
+      {/* 音響メタデータ表示 */}
+      {meta && (
+        <div className='fixed top-4 left-0 right-0 flex justify-center'>
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className='bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg'>
+            <p className='text-sm font-medium'>検出されたメタデータ: {meta}</p>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
