@@ -247,9 +247,9 @@ export default function Home() {
         </div>
 
         {/* スタンプと線路のグリッド */}
-        <div className='w-full max-w-2xl p-4 bg-white shadow-lg'>
+        <div className='w-full max-w-2xl my-4 p-4 bg-white shadow-lg'>
           {/* かわいいタイトル */}
-          <div className='mt-4 mb-6 flex items-center'>
+          <div className='flex mb-6 items-center'>
             <motion.div
               className='mr-3'
               animate={{
@@ -265,9 +265,8 @@ export default function Home() {
             </motion.div>
             <div className='inline-block bg-white transform -rotate-2'>
               <span className='text-xl font-bold text-red-600 flex items-center'>
-                <span className='mr-2 text-xl'>✨</span>
                 <span className='text-gray-700 bg-clip-text tracking-widest'>
-                  スタンプ10個集めて
+                  スタンプ<span className='text-red-600 text-3xl'>10</span>個集めて
                   <br />
                   景品をGET！
                 </span>
