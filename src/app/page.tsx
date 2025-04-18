@@ -265,7 +265,7 @@ export default function Home() {
             </motion.div>
             <div className='inline-block bg-white px-6 py-2 rounded-full border-2 border-red-500 shadow-md transform -rotate-2'>
               <span className='text-md font-bold text-red-600 flex items-center'>
-                <span className='text-black text-transparent bg-clip-text'>スタンプコレクション</span>
+                <span className='text-black bg-clip-text'>スタンプコレクション</span>
                 <span className='ml-2'>✨</span>
               </span>
             </div>

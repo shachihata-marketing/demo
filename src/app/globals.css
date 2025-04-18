@@ -8,8 +8,9 @@ body {
   min-height: 100vh;
   color: #000000;
   background: #ffffff;
-  /* 日本語丸文字のシステムフォントスタックを優先 */
-  font-family: system-ui, -apple-system, 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif !important;
+  /* 日本語用フォントスタック: iOSでHiraginoが選択されるよう追加 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
+               'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif;
 }
 
 #__next {
