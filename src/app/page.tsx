@@ -247,9 +247,9 @@ export default function Home() {
         </div>
 
         {/* スタンプと線路のグリッド */}
-        <div className='w-full max-w-2xl mx-auto p-4 bg-white shadow-lg'>
+        <div className='w-full max-w-2xl p-4 bg-white shadow-lg'>
           {/* かわいいタイトル */}
-          <div className='mt-4 mb-6 flex items-center justify-center'>
+          <div className='mt-4 mb-6 flex items-center'>
             <motion.div
               className='mr-3'
               animate={{
@@ -316,7 +316,7 @@ export default function Home() {
             className={`w-full h-12 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
             onClick={handleSwitchRec}
             disabled={!location || !!locationError}>
-            <span>{isRec ? '停止' : '開始'}</span>
+            <span>{isRec ? '停止' : '音響認識スタート'}</span>
           </button>
         ) : (
           <button

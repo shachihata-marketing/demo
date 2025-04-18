@@ -1,4 +1,9 @@
 @tailwind base;
+@layer base {
+  html, body, div, span, p, h1, h2, h3, h4, h5, h6, a, li, button, input, textarea {
+    font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', -apple-system, BlinkMacSystemFont, 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif !important;
+  }
+}
 @tailwind components;
 @tailwind utilities;
 
@@ -11,6 +16,10 @@ body {
   /* 日本語用フォントスタック: iOSでHiraginoが選択されるよう追加 */
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
                'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif;
+}
+span {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
+      'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif;
 }
 
 #__next {
@@ -43,4 +52,10 @@ body {
     transparent 4px,
     transparent 8px
   );
+}
+
+/* 追加: 全テキスト要素にヒラギノ丸ゴシックを適用 */
+* {
+  font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro',
+               -apple-system, BlinkMacSystemFont, 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif !important;
 }
