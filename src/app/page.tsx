@@ -263,9 +263,14 @@ export default function Home() {
               }}>
               <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
             </motion.div>
-            <div className='inline-block bg-white px-6 py-2 rounded-full border-2 border-red-500 shadow-md transform -rotate-2'>
-              <span className='text-md font-bold text-red-600 flex items-center'>
-                <span className='text-black bg-clip-text'>スタンプコレクション</span>
+            <div className='inline-block bg-white transform -rotate-2'>
+              <span className='text-xl font-bold text-red-600 flex items-center'>
+                <span className='mr-2 text-xl'>✨</span>
+                <span className='text-gray-700 bg-clip-text tracking-widest'>
+                  スタンプ10個集めて
+                  <br />
+                  景品をGET！
+                </span>
                 <span className='ml-2'>✨</span>
               </span>
             </div>
@@ -316,7 +321,7 @@ export default function Home() {
             className={`w-full h-12 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
             onClick={handleSwitchRec}
             disabled={!location || !!locationError}>
-            <span>{isRec ? '停止' : '音響認識スタート'}</span>
+            <span className='text-xl'>{isRec ? '停止' : '📢 音響検知スタート'}</span>
           </button>
         ) : (
           <button
