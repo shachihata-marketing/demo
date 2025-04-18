@@ -1,8 +1,8 @@
 'use client';
+import React, { useEffect, useState } from 'react';
 
 import { useEFP2 } from '@/hooks/useEFP2';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -25,11 +25,26 @@ const STAMPS = [
   // 3行目
 ];
 
+// ローカルストレージキー
+const STORAGE_KEY = 'collectedStamps';
+
 export default function Home() {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const APIKEY =
     'C8w5IdiLDykjCe2Y3kESlzpvFtPxSOyX7wlqJTllFdKHy02IGNmVwMerhQJD6S8ek0zueOdaLEpnL5u25WqYZb5516tGVZcGUrJcgRL6s1veg8d8t7izQqToN/wlbNi1oQNInwTy8KXFgnKxbfsd+cYYQks9JGttFQeY2WiEtZvS/+N4HNVn2u/GZGHOUAv+0oukh1L7gMLxwy6mFGPWbzu6AGUUJjr8rTkWzDuPmuHLEnU1DW+lfI5yQeVfuIab';
+
+  // localStorageから既存のスタンプを読み込む
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setCollectedStamps(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('localStorage読み込みエラー:', e);
+    }
+  }, []);
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,6 +54,15 @@ export default function Home() {
   const { meta, isRec, handleSwitchRec, error: audioError } = useEFP2(APIKEY);
 
   const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
+  // collectedStampsが更新されるたび、localStorageにも保存
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedStamps));
+    } catch (e) {
+      console.error('localStorage書き込みエラー:', e);
+    }
+  }, [collectedStamps]);
+
   const [newStamp, setNewStamp] = useState<(typeof STAMPS)[0] | null>(null);
 
   // 位置情報の取得（1回だけ）
@@ -64,25 +88,33 @@ export default function Home() {
 
   // ユーザー認証状態の確認
   useEffect(() => {
-    const checkUser = async () => {
+    const initAuth = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        setUser(user);
+        if (user) {
+          setUser(user);
+        } else {
+          // セッションがなければ匿名サインイン
+          const {
+            data: { user: anonUser },
+            error: signInError,
+          } = await supabase.auth.signInAnonymously();
+          if (signInError) throw signInError;
+          setUser(anonUser);
+        }
       } catch (error) {
         console.error('認証エラー:', error);
       }
     };
-
-    checkUser();
+    initAuth();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
-
     return () => subscription.unsubscribe();
   }, [supabase]);
 
@@ -163,14 +195,23 @@ export default function Home() {
   };
 
   return (
-    <div className='min-h-screen bg-blue-50 flex flex-col'>
+    <div className='min-h-screen bg-white flex flex-col'>
       {/* ヘッダー部分 */}
-      <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl'>
-        <Image src='/images/logo.png' alt='logo' width={240} height={240} className='object-contain hover:scale-105 transition-transform' />
-      </header>
+      {/* <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl'>
+      </header> */}
 
       {/* メインコンテンツ */}
-      <main className='flex-1 flex flex-col items-center gap-8 px-4 py-8 pb-24 overflow-y-auto'>
+      <main className='flex-1 flex flex-col items-center mb-12 pb-24 overflow-y-auto'>
+        <div className='overflow-hidden shadow-lg hover:shadow-xl transition-shadow'>
+          <Image src='/images/main_image.JPG' alt='main_image' width={1000} height={1000} className='object-contain' />
+        </div>
+        <div className='flex my-2 align-start overflow-hidden hover:shadow-xl transition-shadow'>
+          <Image src='/images/MEITETSU_LOGO_2020.png' alt='main_image' width={70} height={50} className='object-contain' />
+        </div>
+        <div className='overflow-hidden transition-shadow'>
+          <Image src='/images/logo.png' alt='logo' width={300} height={240} className='object-contain hover:scale-105 transition-transform' />
+        </div>
+
         {(locationError || audioError) && (
           <div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative' role='alert'>
             <span className='block sm:inline'>{locationError || audioError}</span>
@@ -186,52 +227,80 @@ export default function Home() {
             )}
           </div>
         )}
-        <div className='rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow'>
-          <Image src='/images/main_image.JPG' alt='main_image' width={1000} height={1000} className='object-contain' />
+
+        <div className='text-center text-md mt-4 text-gray-700 p-4 bg-yellow-50 border-2 border-yellow-400 shadow-md animate-pulse'>
+          <div className='flex items-center justify-center mb-2'>
+            <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6 text-yellow-500 mr-2' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z'
+              />
+            </svg>
+            <span className='font-bold text-yellow-700'>お知らせ</span>
+          </div>
+          スタンプラリーに参加するには
+          <br />
+          マイクの使用を許可してください！
+          <div className='mt-2 text-sm text-yellow-600'>👉 ブラウザの許可ポップアップが表示されたら「許可」を選択してください 👈</div>
         </div>
 
         {/* スタンプと線路のグリッド */}
-        <div className='w-full max-w-2xl mx-auto p-4 bg-white rounded-2xl shadow-lg'>
-          <div className='grid grid-cols-4 gap-4'>
+        <div className='w-full max-w-2xl mx-auto p-4 bg-white shadow-lg'>
+          {/* かわいいタイトル */}
+          <div className='mt-4 mb-6 flex items-center justify-center'>
+            <motion.div
+              className='mr-3'
+              animate={{
+                y: [0, -2, 0, 2, 0],
+                rotate: [-1, 1, -1],
+              }}
+              transition={{
+                repeat: Infinity,
+                duration: 2,
+                ease: 'easeInOut',
+              }}>
+              <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
+            </motion.div>
+            <div className='inline-block bg-white px-6 py-2 rounded-full border-2 border-red-500 shadow-md transform -rotate-2'>
+              <span className='text-md font-bold text-red-600 flex items-center'>
+                <span className='text-black text-transparent bg-clip-text'>スタンプコレクション</span>
+                <span className='ml-2'>✨</span>
+              </span>
+            </div>
+          </div>
+
+          <div className='grid grid-cols-3 gap-4'>
             {STAMPS.map((stamp, index) => (
-              <div key={stamp.id} className='relative'>
+              <div key={stamp.id} className='relative rounded-full overflow-hidden'>
                 {/* 線路の描画（最後のスタンプ以外） */}
-                {index < STAMPS.length - 1 && (
-                  <div
-                    className={`absolute top-1/2 left-[calc(100%_-_8px)] w-[calc(100%_+_16px)] h-2 -z-10 ${
-                      collectedStamps.includes(stamp.id) && collectedStamps.includes(STAMPS[index + 1].id) ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                    style={{
-                      backgroundImage: 'repeating-linear-gradient(90deg, currentColor, currentColor 4px, transparent 4px, transparent 8px)',
-                    }}
-                  />
-                )}
+                {index < STAMPS.length - 1 && <div className='absolute top-1/2 left-[calc(100%_-_8px)] w-[calc(100%_+_16px)] h-2 -z-10 track-bg' />}
 
                 {/* スタンプ */}
                 <div
-                  className={`aspect-square rounded-lg border-2 ${
-                    collectedStamps.includes(stamp.id) ? 'border-blue-600' : 'border-gray-300'
-                  } overflow-hidden group relative`}>
-                  {collectedStamps.includes(stamp.id) ? (
-                    <>
-                      <Image src={stamp.image} alt={stamp.name} fill className='object-cover' />
-                      <button
-                        onClick={() => handleDownload(stamp)}
-                        className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
-                        <DownloadIcon className='w-6 h-6 text-white opacity-0 group-hover:opacity-100' />
-                      </button>
-                    </>
-                  ) : (
-                    <div className='w-full h-full flex items-center justify-center bg-gray-50'>
-                      <div className='w-3 h-3 bg-gray-300 rounded-full' />
-                    </div>
+                  className={`aspect-square rounded-lg border-0 ${collectedStamps.includes(stamp.id) ? 'border-gray-600' : 'border-gray-300'} overflow-hidden group relative`}>
+                  <Image
+                    src={stamp.image}
+                    alt={stamp.name}
+                    fill
+                    className={`object-cover transition-opacity duration-300 ${collectedStamps.includes(stamp.id) ? 'opacity-100' : 'opacity-20'}`}
+                  />
+                  {collectedStamps.includes(stamp.id) && (
+                    <button
+                      onClick={() => handleDownload(stamp)}
+                      className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
+                      <DownloadIcon className='w-6 h-6 text-white opacity-0 group-hover:opacity-100' />
+                    </button>
                   )}
                 </div>
 
                 {/* 駅名 */}
-                <div className='text-center'>
-                  <span className={`text-xs ${collectedStamps.includes(stamp.id) ? 'text-blue-600' : 'text-gray-500'}`}>{stamp.name}</span>
-                </div>
+                {/* <div className='text-center'>
+                  <span className={`${collectedStamps.includes(stamp.id) ? 'text-blue-600' : 'text-gray-500'}`} style={{ fontSize: '10px' }}>
+                    {stamp.name}
+                  </span>
+                </div> */}
               </div>
             ))}
           </div>
@@ -239,13 +308,12 @@ export default function Home() {
       </main>
 
       {/* マイク許可の注意喚起 */}
-      <div className='text-center text-sm text-gray-700 mb-24'>使用するデバイスのマイクの使用を許可してください。</div>
 
       {/* 音声認識ボタンまたは開始ボタン */}
-      <div className='fixed bottom-8 left-0 right-0 flex justify-center'>
+      <div className='fixed px-4 bottom-4 left-0 right-0 flex justify-center'>
         {user ? (
           <button
-            className={`w-36 h-16 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
+            className={`w-full h-12 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
             onClick={handleSwitchRec}
             disabled={!location || !!locationError}>
             <span>{isRec ? '停止' : '開始'}</span>
@@ -254,7 +322,7 @@ export default function Home() {
           <button
             onClick={handleAnonymousSignUp}
             disabled={isLoading}
-            className='w-36 h-16 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl'>
+            className='w-full h-12 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl'>
             {isLoading ? '登録中...' : 'スタート'}
           </button>
         )}
@@ -262,6 +330,17 @@ export default function Home() {
 
       {/* スタンプ獲得アニメーション */}
       <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
+      {/* テスト用: localStorageリセットボタン */}
+      <div className='fixed bottom-20 left-0 right-0 flex justify-center z-50'>
+        <button
+          onClick={() => {
+            localStorage.removeItem(STORAGE_KEY);
+            setCollectedStamps([]);
+          }}
+          className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded'>
+          Test: Reset Stamps
+        </button>
+      </div>
     </div>
   );
 }
@@ -274,29 +353,60 @@ const DownloadIcon = ({ className }: { className?: string }) => (
 );
 
 // スタンプ獲得アニメーション
-const StampCollectionAnimation: React.FC<{
-  stamp: (typeof STAMPS)[0];
-  onComplete: () => void;
-}> = ({ stamp, onComplete }) => {
-  // スタンプ取得時の効果音再生
+const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete: () => void }> = ({ stamp, onComplete }) => {
+  // 電車アニメーション & スタンプ拡大切り替え用 state
+  const [showTrain, setShowTrain] = useState(true);
+  const [showStamp, setShowStamp] = useState(false);
+  // 効果音再生
+  // useEffect(() => {
+  //   const audio = new Audio('/sounds/acquired.mp3');
+  //   audio.play().catch((err) => console.error('音声再生エラー:', err));
+  // }, []);
+  // 電車アニメーション完了後にスタンプ表示へ
   useEffect(() => {
-    const audio = new Audio('/sounds/acquired.mp3');
-    audio.play().catch((err) => console.error('音声再生エラー:', err));
-  }, []);
-
+    if (showTrain) {
+      const timer = setTimeout(() => {
+        setShowTrain(false);
+        setShowStamp(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [showTrain]);
+  // スタンプ表示後に1秒拡大＋バウンス → 2秒停止後に完了コール
+  useEffect(() => {
+    if (showStamp) {
+      const completeTimer = setTimeout(onComplete, 4000);
+      return () => clearTimeout(completeTimer);
+    }
+  }, [showStamp, onComplete]);
   return (
     <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 backdrop-blur-sm'>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } }}
-        exit={{ opacity: 0, transition: { duration: 0.3 } }}
-        onAnimationComplete={() => {
-          setTimeout(onComplete, 6000);
-        }}
-        className='relative'>
-        <div className='absolute inset-0 bg-red-600 opacity-0 animate-stamp rounded-2xl' />
-        <Image src={stamp.image} alt={stamp.name} width={240} height={240} className='rounded-2xl shadow-2xl' />
-      </motion.div>
+      {showTrain && (
+        <motion.div
+          initial={{ x: '-100%', y: 0 }}
+          animate={{
+            x: '100%',
+            y: [0, 0, -20, 0],
+          }}
+          transition={{
+            x: { duration: 1, ease: 'linear' },
+            y: { times: [0, 0.8, 0.9, 1], duration: 1.2, ease: 'easeOut' },
+          }}
+          className='absolute top-1/2 left-0'>
+          <Image src='/images/wrapped_densha.png' alt='電車' width={800} height={400} />
+        </motion.div>
+      )}
+      {showStamp && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1, 0.8, 1] }}
+          transition={{ scale: { times: [0, 0.75, 0.9, 1], duration: 1, ease: 'easeOut' } }}
+          className='relative'
+          style={{ opacity: 1 }}>
+          <div className='absolute inset-0 bg-red-600 opacity-0 animate-stamp rounded-2xl' />
+          <Image src={stamp.image} alt={stamp.name} width={300} height={300} className='rounded-2xl shadow-2xl' />
+        </motion.div>
+      )}
     </div>
   );
 };

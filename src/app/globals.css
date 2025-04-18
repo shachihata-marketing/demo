@@ -8,7 +8,8 @@ body {
   min-height: 100vh;
   color: #000000;
   background: #ffffff;
-  font-family: Arial, Helvetica, sans-serif;
+  /* 日本語丸文字のシステムフォントスタックを優先 */
+  font-family: system-ui, -apple-system, 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif !important;
 }
 
 #__next {
@@ -30,4 +31,15 @@ body {
 
 .animate-stamp {
   animation: stampEffect 0.5s ease-out;
+}
+
+/* 空欄スタンプに線路風パターンを表示 */
+.track-bg {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #ccc,
+    #ccc 4px,
+    transparent 4px,
+    transparent 8px
+  );
 }

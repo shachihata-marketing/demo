@@ -12,6 +12,10 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        sans: ['system-ui', '-apple-system', 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', 'sans-serif'],
+        mono: ['Menlo', 'Monaco', 'Courier New', 'monospace'],
+      },
     },
   },
   plugins: [],

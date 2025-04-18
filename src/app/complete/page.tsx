@@ -69,18 +69,34 @@ export default function CompletePage() {
   };
 
   return (
-    <div className='min-h-screen bg-blue-50 flex flex-col items-center justify-center p-4'>
+    <div className='min-h-screen bg-white flex flex-col items-center justify-center p-4'>
       {/* ヘッダー部分 */}
-      <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl fixed top-0 left-0 right-0'>
-        <Image src='/images/logo.png' alt='logo' width={120} height={120} className='object-contain hover:scale-105 transition-transform' />
+      <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl fixed top-0 left-0 right-0 z-10'>
+        <Image src='/images/logo.png' alt='logo' width={180} height={120} className='object-contain hover:scale-100 transition-transform' />
       </header>
 
       {/* メインコンテンツ */}
-      <main className='flex flex-col items-center justify-center gap-8 mt-32 mb-8'>
+      <main className='flex flex-col items-center justify-center gap-4 mt-24 mb-8'>
         {/* おめでとうメッセージ */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className='text-center'>
-          <h1 className='text-3xl font-bold text-blue-600 mb-4'>コンプリートおめでとうございます！</h1>
-          <p className='text-gray-600'>全てのスタンプを集めることができました</p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className='text-center relative z-0'>
+          <h1 className='text-3xl font-bold text-blue-600 mb-4 relative z-0'>
+            <span className='bg-gradient-to-r from-pink-500 via-yellow-500 to-blue-500 text-transparent bg-clip-text'>コンプリート</span>
+            <br />
+            <span className='relative inline-block'>
+              おめでとうございます！
+              <span className='absolute -top-2 -right-4 text-2xl animate-pulse'>🎉</span>
+              <span className='absolute -bottom-2 -left-4 text-2xl animate-pulse'>🎊</span>
+            </span>
+          </h1>
+          <p className='text-gray-600'>
+            ご参加いただき
+            <br />
+            誠にありがとうございました
+          </p>
         </motion.div>
 
         {/* コンプリート画像 */}
@@ -88,8 +104,8 @@ export default function CompletePage() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className='relative rounded-2xl overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow'>
-          <Image src='/images/complete_image.JPG' alt='complete' width={800} height={600} className='object-contain rounded-2xl' />
+          className='relative overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow'>
+          <Image src='/images/complete_image.JPG' alt='complete' width={800} height={600} className='object-contain' />
         </motion.div>
 
         {/* 紙吹雪アニメーション */}
@@ -147,6 +163,17 @@ export default function CompletePage() {
             {isLoading ? <span>処理中...</span> : isExchanged ? <span>景品交換済み</span> : <span>景品と交換する</span>}
           </button>
 
+          {/* YouTube 動画埋め込み (ミュート + 自動再生) */}
+          <div className='w-full max-w-2xl mb-4 aspect-video'>
+            <iframe
+              className='w-full h-full'
+              src='https://www.youtube.com/embed/sG2qLjitPxw?autoplay=1&mute=1'
+              title='YouTube video'
+              frameBorder='0'
+              allow='autoplay; encrypted-media'
+              allowFullScreen
+            />
+          </div>
           <Link
             href='/'
             className='px-8 py-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:shadow-xl active:scale-95'>
