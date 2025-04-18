@@ -11,7 +11,7 @@ import type { User } from '@supabase/auth-helpers-nextjs';
 // スタンプの定義
 const STAMPS = [
   // 1行目
-  { id: 1, name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'sakaemachi' },
+  { id: 1, name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'bell' },
   { id: 2, name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
   { id: 3, name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
   { id: 4, name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
@@ -86,6 +86,37 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
+  // 保存されたスタンプをSupabaseから取得する
+  useEffect(() => {
+    if (!user) return;
+    const fetchStamps = async () => {
+      try {
+        const { data, error } = await supabase.from('user_stamps').select('stamps').eq('user_id', user.id).single();
+        if (error && error.code !== 'PGRST116') throw error;
+        if (data?.stamps) {
+          setCollectedStamps(data.stamps);
+        }
+      } catch (error) {
+        console.error('スタンプ取得エラー:', error);
+      }
+    };
+    fetchStamps();
+  }, [user, supabase]);
+
+  // collectedStampsの変更をSupabaseに保存する
+  useEffect(() => {
+    if (!user) return;
+    const saveStamps = async () => {
+      try {
+        const { error } = await supabase.from('user_stamps').upsert({ user_id: user.id, stamps: collectedStamps }, { onConflict: 'user_id' });
+        if (error) throw error;
+      } catch (error) {
+        console.error('スタンプ保存エラー:', error);
+      }
+    };
+    saveStamps();
+  }, [collectedStamps, user, supabase]);
+
   // 匿名ユーザー登録
   const handleAnonymousSignUp = async () => {
     try {
@@ -101,21 +132,19 @@ export default function Home() {
   };
 
   useEffect(() => {
-    console.log(meta);
-    if (meta) {
-      const matchedStamp = STAMPS.find((stamp) => stamp.meta === meta);
-      if (matchedStamp && !collectedStamps.includes(matchedStamp.id)) {
-        setCollectedStamps((prev) => [...prev, matchedStamp.id]);
-        setNewStamp(matchedStamp);
+    if (!meta) return;
+    const matchedStamp = STAMPS.find((stamp) => stamp.meta === meta);
+    if (matchedStamp && !collectedStamps.includes(matchedStamp.id)) {
+      const updatedStamps = [...collectedStamps, matchedStamp.id];
+      setCollectedStamps(updatedStamps);
+      setNewStamp(matchedStamp);
 
-        // 全てのスタンプを集めた場合
-        const updatedStamps = [...collectedStamps, matchedStamp.id];
-        if (updatedStamps.length === STAMPS.length) {
-          // 少し待ってからコンプリートページに遷移
-          setTimeout(() => {
-            router.push('/meitetsu/complete');
-          }, 2000);
-        }
+      // 全てのスタンプを集めた場合
+      if (updatedStamps.length === STAMPS.length) {
+        // 少し待ってからコンプリートページに遷移
+        setTimeout(() => {
+          router.push('/meitetsu/complete');
+        }, 2000);
       }
     }
   }, [meta, collectedStamps, router]);
@@ -141,7 +170,7 @@ export default function Home() {
       </header>
 
       {/* メインコンテンツ */}
-      <main className='flex-1 flex flex-col items-center gap-8 px-4 py-8 overflow-y-auto'>
+      <main className='flex-1 flex flex-col items-center gap-8 px-4 py-8 pb-24 overflow-y-auto'>
         {(locationError || audioError) && (
           <div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative' role='alert'>
             <span className='block sm:inline'>{locationError || audioError}</span>
@@ -209,26 +238,21 @@ export default function Home() {
         </div>
       </main>
 
+      {/* マイク許可の注意喚起 */}
+      <div className='text-center text-sm text-gray-700 mb-24'>使用するデバイスのマイクの使用を許可してください。</div>
+
       {/* 音声認識ボタンまたは開始ボタン */}
       <div className='fixed bottom-8 left-0 right-0 flex justify-center'>
         {user ? (
           <button
-            className={`w-36 h-16 rounded-full flex items-center justify-center ${
-              isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
-            } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
-            onClick={() => {
-              console.log('音声認識ボタンがクリックされました');
-              handleSwitchRec();
-            }}
+            className={`w-36 h-16 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
+            onClick={handleSwitchRec}
             disabled={!location || !!locationError}>
             <span>{isRec ? '停止' : '開始'}</span>
           </button>
         ) : (
           <button
-            onClick={() => {
-              console.log('匿名登録ボタンがクリックされました');
-              handleAnonymousSignUp();
-            }}
+            onClick={handleAnonymousSignUp}
             disabled={isLoading}
             className='w-36 h-16 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl'>
             {isLoading ? '登録中...' : 'スタート'}
@@ -238,18 +262,6 @@ export default function Home() {
 
       {/* スタンプ獲得アニメーション */}
       <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
-      {/* 音響メタデータ表示 */}
-      {meta && (
-        <div className='fixed top-4 left-0 right-0 flex justify-center'>
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className='bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg'>
-            <p className='text-sm font-medium'>検出されたメタデータ: {meta}</p>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }
@@ -266,18 +278,21 @@ const StampCollectionAnimation: React.FC<{
   stamp: (typeof STAMPS)[0];
   onComplete: () => void;
 }> = ({ stamp, onComplete }) => {
+  // スタンプ取得時の効果音再生
+  useEffect(() => {
+    const audio = new Audio('/sounds/acquired.mp3');
+    audio.play().catch((err) => console.error('音声再生エラー:', err));
+  }, []);
+
   return (
     <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 backdrop-blur-sm'>
       <motion.div
-        initial={{ scale: 2, y: -100, rotate: -45 }}
-        animate={{
-          scale: [2, 1.5, 1],
-          y: [-100, 0, 0],
-          rotate: [-45, -45, 0],
-          transition: { duration: 1.2, times: [0, 0.6, 1], ease: 'easeOut' },
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } }}
+        exit={{ opacity: 0, transition: { duration: 0.3 } }}
+        onAnimationComplete={() => {
+          setTimeout(onComplete, 6000);
         }}
-        exit={{ scale: 0, opacity: 0, transition: { duration: 0.3 } }}
-        onAnimationComplete={onComplete}
         className='relative'>
         <div className='absolute inset-0 bg-red-600 opacity-0 animate-stamp rounded-2xl' />
         <Image src={stamp.image} alt={stamp.name} width={240} height={240} className='rounded-2xl shadow-2xl' />
