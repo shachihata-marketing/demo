@@ -165,17 +165,34 @@ export default function Home() {
     }
   }, [meta, collectedStamps, router]);
 
-  const handleDownload = async (stamp: (typeof STAMPS)[0]) => {
-    const response = await fetch(stamp.image);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `stamp_${stamp.name}.jpg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+  const handleSaveStamp = async (stamp: (typeof STAMPS)[number]) => {
+    try {
+      const res = await fetch(stamp.image);
+      const blob = await res.blob();
+      const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: stamp.name });
+      } else {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (e: unknown) {
+      // Error オブジェクトか確認
+      if (e instanceof Error) {
+        // ユーザーがキャンセルした場合（Share canceled）を無視
+        if (e.name !== 'AbortError') {
+          console.error('Stamp save error:', e);
+        }
+      } else {
+        console.error('Stamp save error (non-error):', e);
+      }
+    }
   };
 
   // initialize window size for confetti
@@ -291,7 +308,7 @@ export default function Home() {
                     />
                     {collectedStamps.includes(stamp.id) ? (
                       <button
-                        onClick={() => handleDownload(stamp)}
+                        onClick={() => handleSaveStamp(stamp)}
                         className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
                         <DownloadIcon className='w-6 h-6 text-white opacity-0 group-hover:opacity-100' />
                       </button>

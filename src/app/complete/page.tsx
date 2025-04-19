@@ -78,22 +78,40 @@ export default function CompletePage() {
 
   useEffect(() => {
     if (fireworks) {
-      const timer = setTimeout(() => setShowFireworks(false), 5000);
+      const timer = setTimeout(() => setShowFireworks(false), 4500);
       return () => clearTimeout(timer);
     }
   }, [fireworks]);
 
   const handleDownload = async () => {
-    const response = await fetch('/images/complete_image.JPG');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'meitetsu_rally_complete.jpg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    try {
+      const imagePath = '/images/complete_image.JPG';
+      const res = await fetch(imagePath);
+      const blob = await res.blob();
+      const file = new File([blob], 'meitetsu_rally_complete.jpg', { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'めいてつ瀬戸線 スタンプラリーコンプリート' });
+      } else {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (e: unknown) {
+      // Error オブジェクトか確認
+      if (e instanceof Error) {
+        // ユーザーがキャンセルした場合（Share canceled）を無視
+        if (e.name !== 'AbortError') {
+          console.error('Complete image save error:', e);
+        }
+      } else {
+        console.error('Complete image save error (non-error):', e);
+      }
+    }
   };
 
   const handleSaveStamp = async (stamp: (typeof STAMPS)[number]) => {
@@ -144,6 +162,29 @@ export default function CompletePage() {
         {showFireworks && fireworks ? (
           <div className='fixed inset-0 flex items-center justify-center bg-white z-50'>
             <Lottie animationData={fireworks} loop autoPlay style={{ width: '100%', height: '100%' }} />
+            <div className='absolute inset-0 flex items-center justify-center'>
+              <Image
+                src='/images/logo.png'
+                alt='logo'
+                width={180}
+                height={120}
+                className='object-contain'
+                style={{
+                  animation: 'zoom-in 4.5s ease-out forwards',
+                }}
+              />
+              <style jsx global>{`
+                @keyframes zoom-in {
+                  from {
+                    transform: scale(0);
+                  }
+                  to {
+                    transform: scale(1);
+                    width: 100%;
+                  }
+                }
+              `}</style>
+            </div>
           </div>
         ) : (
           <>
@@ -169,8 +210,8 @@ export default function CompletePage() {
                   <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
                 </motion.div>
                 <div className='flex flex-col'>
-                  <div className='text-xl font-bold relative z-0'>
-                    <span className='relative inline-block'>おめでとうございます！</span>
+                  <div className='text-gray-600 text-xl font-bold relative z-0'>
+                    <span className='relative inline-block'>おめでとうございます 🎉</span>
                   </div>
                   <p className='text-gray-600 text-sm'>コンプリート記念画像はこちらです👇</p>
                 </div>
