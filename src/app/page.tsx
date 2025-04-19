@@ -1,13 +1,17 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+// CSR専用: react-confetti を SSR 無効で動的ロード
+const ReactConfetti = dynamic(() => import('react-confetti'), { ssr: false });
+// CSR専用: lottie-react を SSR 無効で動的ロード
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
-import { useEFP2 } from '@/hooks/useEFP2';
-import Image from 'next/image';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
-import Lottie from 'lottie-react';
+import { useEFP2 } from '@/hooks/useEFP2';
+import Image from 'next/image';
 
 // スタンプの定義
 const STAMPS = [
@@ -41,18 +45,6 @@ export default function Home() {
   const APIKEY =
     'C8w5IdiLDykjCe2Y3kESlzpvFtPxSOyX7wlqJTllFdKHy02IGNmVwMerhQJD6S8ek0zueOdaLEpnL5u25WqYZb5516tGVZcGUrJcgRL6s1veg8d8t7izQqToN/wlbNi1oQNInwTy8KXFgnKxbfsd+cYYQks9JGttFQeY2WiEtZvS/+N4HNVn2u/GZGHOUAv+0oukh1L7gMLxwy6mFGPWbzu6AGUUJjr8rTkWzDuPmuHLEnU1DW+lfI5yQeVfuIab';
 
-  // localStorageから既存のスタンプを読み込む
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setCollectedStamps(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('localStorage読み込みエラー:', e);
-    }
-  }, []);
-
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -60,7 +52,14 @@ export default function Home() {
 
   const { meta, isRec, handleSwitchRec, error: audioError } = useEFP2(APIKEY);
 
-  const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
+  const [collectedStamps, setCollectedStamps] = useState<number[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   // collectedStampsが更新されるたび、localStorageにも保存
   useEffect(() => {
     try {
@@ -200,6 +199,25 @@ export default function Home() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
+
+  // initialize window size for confetti
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const updateSize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  // show confetti for 2 seconds when newStamp is set
+  const [showConfetti, setShowConfetti] = useState(false);
+  useEffect(() => {
+    if (newStamp) {
+      setShowConfetti(true);
+      const timer = setTimeout(() => setShowConfetti(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [newStamp]);
 
   return (
     <div className='min-h-screen bg-white flex flex-col'>
@@ -356,6 +374,9 @@ export default function Home() {
           Test: コンプリート画面へ
         </button>
       </div>
+
+      {/* Confetti animation loaded dynamically on client */}
+      {showConfetti && <ReactConfetti width={windowSize.width} height={windowSize.height} recycle={false} numberOfPieces={200} />}
     </div>
   );
 }
