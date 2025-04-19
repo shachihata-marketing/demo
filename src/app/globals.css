@@ -7,15 +7,27 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-rgb: 0, 0, 0;
+  }
+}
+
 body {
   height: 100%;
   min-height: 100vh;
-  color: #000000;
-  background: #ffffff;
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
   /* 日本語用フォントスタック: iOSでHiraginoが選択されるよう追加 */
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
                'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif;
+  overscroll-behavior: none; /* ユーザーが画面を引っ張った時の挙動を変更 */
 }
 span {
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
@@ -27,35 +39,83 @@ span {
   background: #ffffff;
 }
 
-@keyframes stampEffect {
+@keyframes stamp-pulse {
   0% {
     opacity: 0;
+    transform: scale(0.8);
   }
   50% {
     opacity: 0.5;
+    transform: scale(1.1);
   }
   100% {
     opacity: 0;
+    transform: scale(1.2);
   }
 }
 
 .animate-stamp {
-  animation: stampEffect 0.5s ease-out;
+  animation: stamp-pulse 1s ease-in-out infinite;
 }
 
 /* 空欄スタンプに線路風パターンを表示 */
 .track-bg {
   background-image: repeating-linear-gradient(
     90deg,
-    #ccc,
-    #ccc 4px,
-    transparent 4px,
-    transparent 8px
+    #a1a1aa 0%,
+    #a1a1aa 25%,
+    transparent 25%,
+    transparent 50%,
+    #a1a1aa 50%,
+    #a1a1aa 75%,
+    transparent 75%,
+    transparent 100%
   );
+  background-size: 16px;
 }
 
 /* 追加: 全テキスト要素にヒラギノ丸ゴシックを適用 */
 * {
   font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro',
                -apple-system, BlinkMacSystemFont, 'Yu Gothic', 'YuGothic', 'Meiryo', sans-serif !important;
+}
+
+/* PC向けの追加スタイル */
+@media (min-width: 768px) {
+  /* PCビューでのスクロールバーカスタマイズ */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  
+  /* PCでのコンテナスタイル */
+  body {
+    background: #f0f0f0;
+  }
+  
+  /* PCでは画面中央にスマートフォン風の表示にする */
+  .max-w-md, .max-w-lg, .max-w-2xl, .max-w-3xl {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    background-color: white;
+  }
+  
+  /* フォントサイズ調整 */
+  @media (min-width: 1024px) {
+    html {
+      font-size: 18px;
+    }
+  }
 }

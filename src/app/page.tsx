@@ -12,35 +12,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
 import { useEFP2 } from '@/hooks/useEFP2';
 import Image from 'next/image';
-
-// スタンプの定義
-export const STAMPS = [
-  // 1行目
-  { id: 1, station_name: '栄町', name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'bell' },
-  { id: 2, station_name: '東大手', name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
-  { id: 3, station_name: '大曽根', name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
-  { id: 4, station_name: '喜多山', name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
-  {
-    id: 5,
-    station_name: '大森・金城学院前',
-    name: '大森・金城学院前',
-    image: '/images/stamps/5_oomori_kinjougakuinmae.jpg',
-    meta: 'omorikinjogakuinmae',
-  },
-  { id: 6, station_name: '尾張旭', name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
-  { id: 7, station_name: '新瀬戸', name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
-  { id: 8, station_name: '瀬戸市役所前', name: '瀬戸市役所前', image: '/images/stamps/10_greencity.jpeg', meta: 'setoshiyakushomae' },
-  { id: 9, station_name: '瀬戸蔵ミュージアム', name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
-  {
-    id: 10,
-    station_name: '尾張旭まち案内 ',
-    name: 'Asumi_赤い電車_君とせとでん',
-    image: '/images/stamps/9_setokura.JPG',
-    meta: 'asumi_kimitosetoden',
-  },
-  // 2行目
-  // 3行目
-];
+import { STAMPS } from '@/lib/stamps';
 
 // ローカルストレージキー
 const STORAGE_KEY = 'collectedStamps';
@@ -226,163 +198,165 @@ export default function Home() {
   }, [newStamp]);
 
   return (
-    <div className='min-h-screen bg-white flex flex-col'>
-      {/* メインコンテンツ */}
-      <main className='flex-1 flex flex-col items-center mb-12 pb-24 overflow-y-auto'>
-        <div className='overflow-hidden shadow-lg hover:shadow-xl transition-shadow'>
-          <Image src='/images/main_image.JPG' alt='main_image' width={1000} height={1000} className='object-contain' />
-        </div>
-        <div className='flex my-2 align-start overflow-hidden hover:shadow-xl transition-shadow'>
-          <Image src='/images/MEITETSU_LOGO_2020.png' alt='main_image' width={70} height={50} className='object-contain' />
-        </div>
-        <div className='overflow-hidden transition-shadow'>
-          <Image src='/images/logo.png' alt='logo' width={300} height={240} className='object-contain hover:scale-105 transition-transform' />
-        </div>
+    <div className='min-h-screen bg-white flex flex-col items-center'>
+      <div className='w-full max-w-md mx-auto sm:max-w-lg md:max-w-2xl lg:max-w-3xl relative'>
+        {/* メインコンテンツ */}
+        <main className='flex-1 flex flex-col items-center mb-12 pb-24 overflow-y-auto w-full'>
+          <div className='overflow-hidden shadow-lg hover:shadow-xl transition-shadow'>
+            <Image src='/images/main_image.JPG' alt='main_image' width={1000} height={1000} className='object-contain' />
+          </div>
+          <div className='flex my-2 align-start overflow-hidden hover:shadow-xl transition-shadow'>
+            <Image src='/images/MEITETSU_LOGO_2020.png' alt='main_image' width={70} height={50} className='object-contain' />
+          </div>
+          <div className='overflow-hidden transition-shadow'>
+            <Image src='/images/logo.png' alt='logo' width={300} height={240} className='object-contain hover:scale-105 transition-transform' />
+          </div>
 
-        {(locationError || audioError) && (
-          <div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative' role='alert'>
-            <span className='block sm:inline'>{locationError || audioError}</span>
-            {locationError && (
-              <button
-                onClick={() => {
-                  setLocationError(null);
-                  setLocation(null);
+          {(locationError || audioError) && (
+            <div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative' role='alert'>
+              <span className='block sm:inline'>{locationError || audioError}</span>
+              {locationError && (
+                <button
+                  onClick={() => {
+                    setLocationError(null);
+                    setLocation(null);
+                  }}
+                  className='ml-4 text-sm underline hover:no-underline'>
+                  再試行
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className='text-center text-md mt-4 text-gray-700 p-4 bg-yellow-50 border-2 border-yellow-400 shadow-md animate-pulse'>
+            <div className='flex items-center justify-center mb-2'>
+              <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6 text-yellow-500 mr-2' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z'
+                />
+              </svg>
+              <span className='font-bold text-yellow-700'>お知らせ</span>
+            </div>
+            スタンプラリーに参加するには
+            <br />
+            マイクの使用を許可してください！
+            <div className='mt-2 text-sm text-yellow-600'>👉 ブラウザの許可ポップアップが表示されたら「許可」を選択してください 👈</div>
+          </div>
+
+          {/* スタンプと線路のグリッド */}
+          <div className='w-full max-w-2xl my-4 p-4 bg-white shadow-lg'>
+            {/* かわいいタイトル */}
+            <div className='flex mb-6 items-center'>
+              <motion.div
+                className='mr-3'
+                animate={{
+                  y: [0, -2, 0, 2, 0],
+                  rotate: [-1, 1, -1],
                 }}
-                className='ml-4 text-sm underline hover:no-underline'>
-                再試行
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className='text-center text-md mt-4 text-gray-700 p-4 bg-yellow-50 border-2 border-yellow-400 shadow-md animate-pulse'>
-          <div className='flex items-center justify-center mb-2'>
-            <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6 text-yellow-500 mr-2' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z'
-              />
-            </svg>
-            <span className='font-bold text-yellow-700'>お知らせ</span>
-          </div>
-          スタンプラリーに参加するには
-          <br />
-          マイクの使用を許可してください！
-          <div className='mt-2 text-sm text-yellow-600'>👉 ブラウザの許可ポップアップが表示されたら「許可」を選択してください 👈</div>
-        </div>
-
-        {/* スタンプと線路のグリッド */}
-        <div className='w-full max-w-2xl my-4 p-4 bg-white shadow-lg'>
-          {/* かわいいタイトル */}
-          <div className='flex mb-6 items-center'>
-            <motion.div
-              className='mr-3'
-              animate={{
-                y: [0, -2, 0, 2, 0],
-                rotate: [-1, 1, -1],
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 2,
-                ease: 'easeInOut',
-              }}>
-              <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
-            </motion.div>
-            <div className='inline-block bg-white transform -rotate-2'>
-              <span className='text-xl font-bold text-red-600 flex items-center'>
-                <span className='text-gray-700 bg-clip-text tracking-widest'>
-                  スタンプ<span className='text-red-600 text-3xl'>10</span>個集めて
-                  <br />
-                  景品をGET！
+                transition={{
+                  repeat: Infinity,
+                  duration: 2,
+                  ease: 'easeInOut',
+                }}>
+                <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
+              </motion.div>
+              <div className='inline-block bg-white transform -rotate-2'>
+                <span className='text-xl font-bold text-red-600 flex items-center'>
+                  <span className='text-gray-700 bg-clip-text tracking-widest'>
+                    スタンプ<span className='text-red-600 text-3xl'>10</span>個集めて
+                    <br />
+                    景品をGET！
+                  </span>
+                  <span className='ml-2'>✨</span>
                 </span>
-                <span className='ml-2'>✨</span>
-              </span>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-3 gap-4 md:grid-cols-5'>
+              {STAMPS.map((stamp, index) => (
+                <div key={stamp.id} className='relative rounded-md overflow-hidden'>
+                  {/* 線路の描画（最後のスタンプ以外） */}
+                  {index < STAMPS.length - 1 && <div className='absolute top-1/2 left-[calc(100%_-_8px)] w-[calc(100%_+_16px)] h-2 -z-10 track-bg' />}
+
+                  {/* スタンプ */}
+                  <div className={`aspect-square rounded-md overflow-hidden group relative`}>
+                    <Image
+                      src={stamp.image}
+                      alt={stamp.name}
+                      fill
+                      className={`object-cover transition-opacity duration-300 ${collectedStamps.includes(stamp.id) ? 'opacity-100' : 'opacity-5'}`}
+                    />
+                    {collectedStamps.includes(stamp.id) ? (
+                      <button
+                        onClick={() => handleDownload(stamp)}
+                        className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
+                        <DownloadIcon className='w-6 h-6 text-white opacity-0 group-hover:opacity-100' />
+                      </button>
+                    ) : (
+                      <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
+                        <span className='text-gray-500 text-4xl font-bold opacity-70'>?</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 駅名 */}
+                  <div className='text-center'>
+                    <span
+                      className={`${collectedStamps.includes(stamp.id) ? 'text-blue-600' : 'text-gray-500'}`}
+                      style={{ fontSize: '10px', lineHeight: 0.8 }}>
+                      {stamp.station_name}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        </main>
 
-          <div className='grid grid-cols-3 gap-4'>
-            {STAMPS.map((stamp, index) => (
-              <div key={stamp.id} className='relative rounded-md overflow-hidden'>
-                {/* 線路の描画（最後のスタンプ以外） */}
-                {index < STAMPS.length - 1 && <div className='absolute top-1/2 left-[calc(100%_-_8px)] w-[calc(100%_+_16px)] h-2 -z-10 track-bg' />}
+        {/* マイク許可の注意喚起 */}
 
-                {/* スタンプ */}
-                <div className={`aspect-square rounded-md overflow-hidden group relative`}>
-                  <Image
-                    src={stamp.image}
-                    alt={stamp.name}
-                    fill
-                    className={`object-cover transition-opacity duration-300 ${collectedStamps.includes(stamp.id) ? 'opacity-100' : 'opacity-5'}`}
-                  />
-                  {collectedStamps.includes(stamp.id) ? (
-                    <button
-                      onClick={() => handleDownload(stamp)}
-                      className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
-                      <DownloadIcon className='w-6 h-6 text-white opacity-0 group-hover:opacity-100' />
-                    </button>
-                  ) : (
-                    <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
-                      <span className='text-gray-500 text-4xl font-bold opacity-70'>?</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 駅名 */}
-                <div className='text-center'>
-                  <span
-                    className={`${collectedStamps.includes(stamp.id) ? 'text-blue-600' : 'text-gray-500'}`}
-                    style={{ fontSize: '10px', lineHeight: 0.8 }}>
-                    {stamp.station_name}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* 音声認識ボタンまたは開始ボタン */}
+        <div className='fixed px-4 bottom-4 left-0 right-0 flex justify-center sm:w-auto sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 max-w-md sm:max-w-lg'>
+          {user ? (
+            <button
+              className={`w-full h-12 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''} max-w-sm mx-auto`}
+              onClick={handleSwitchRec}
+              disabled={!location || !!locationError}>
+              <span className='text-xl'>{isRec ? '停止' : '📢 音響検知スタート'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleAnonymousSignUp}
+              disabled={isLoading}
+              className='w-full h-12 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto'>
+              {isLoading ? '登録中...' : 'スタート'}
+            </button>
+          )}
         </div>
-      </main>
 
-      {/* マイク許可の注意喚起 */}
-
-      {/* 音声認識ボタンまたは開始ボタン */}
-      <div className='fixed px-4 bottom-4 left-0 right-0 flex justify-center'>
-        {user ? (
+        {/* スタンプ獲得アニメーション */}
+        <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
+        {/* テスト用: localStorageリセットボタン */}
+        <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4'>
           <button
-            className={`w-full h-12 rounded-full flex items-center justify-center ${isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'} text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${!location || !!locationError ? 'opacity-50' : ''}`}
-            onClick={handleSwitchRec}
-            disabled={!location || !!locationError}>
-            <span className='text-xl'>{isRec ? '停止' : '📢 音響検知スタート'}</span>
+            onClick={() => {
+              localStorage.removeItem(STORAGE_KEY);
+              setCollectedStamps([]);
+            }}
+            className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded md:px-6 md:py-3 md:text-lg'>
+            Test: Reset Stamps
           </button>
-        ) : (
-          <button
-            onClick={handleAnonymousSignUp}
-            disabled={isLoading}
-            className='w-full h-12 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl'>
-            {isLoading ? '登録中...' : 'スタート'}
+          <button onClick={() => router.push('/complete')} className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded'>
+            Test: コンプリート画面へ
           </button>
-        )}
-      </div>
+        </div>
 
-      {/* スタンプ獲得アニメーション */}
-      <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
-      {/* テスト用: localStorageリセットボタン */}
-      <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50'>
-        <button
-          onClick={() => {
-            localStorage.removeItem(STORAGE_KEY);
-            setCollectedStamps([]);
-          }}
-          className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded'>
-          Test: Reset Stamps
-        </button>
-        <button onClick={() => router.push('/complete')} className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded'>
-          Test: コンプリート画面へ
-        </button>
+        {/* Confetti animation loaded dynamically on client */}
+        {showConfetti && <ReactConfetti width={windowSize.width} height={windowSize.height} recycle={false} numberOfPieces={200} />}
       </div>
-
-      {/* Confetti animation loaded dynamically on client */}
-      {showConfetti && <ReactConfetti width={windowSize.width} height={windowSize.height} recycle={false} numberOfPieces={200} />}
     </div>
   );
 }
