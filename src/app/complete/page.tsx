@@ -103,9 +103,9 @@ export default function CompletePage() {
           </header>
 
           {/* メインコンテンツ */}
-          <main className='relative flex flex-col items-center justify-center gap-4 mt-24 mb-8'>
+          <main className='relative flex flex-col items-center justify-center gap-2 mt-24 mb-8'>
             {/* おめでとうメッセージ */}
-            <div className='relative z-0'>
+            <div className='flex items-center w-full mb-4'>
               <motion.div
                 className='mr-3'
                 animate={{
@@ -119,12 +119,12 @@ export default function CompletePage() {
                 }}>
                 <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
               </motion.div>
-              <h1 className='text-xl font-bold mb-4 relative mt-4 z-0'>
-                <span className='text-xl'>コンプリート</span>
-                <br />
-                <span className='relative inline-block'>おめでとうございます！</span>
-              </h1>
-              <p className='text-gray-600'>コンプリート記念画像はこちらです</p>{' '}
+              <div className='flex flex-col'>
+                <div className='text-xl font-bold relative z-0'>
+                  <span className='relative inline-block'>おめでとうございます！</span>
+                </div>
+                <p className='text-gray-600 text-sm'>コンプリート記念画像はこちらです👇</p>
+              </div>
             </div>
 
             {/* コンプリート画像 */}
@@ -132,8 +132,35 @@ export default function CompletePage() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className='relative overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow'>
-              <Image src='/images/complete_image.JPG' alt='complete' width={800} height={600} className='object-contain' />
+              className='relative overflow-hidden transform-gpu hover:shadow-3xl transition-all'
+              style={{
+                perspective: '1000px',
+                transformStyle: 'preserve-3d',
+              }}>
+              <div
+                className='p-2 bg-gradient-to-r from-amber-100 to-amber-200 border-8 border-amber-700 rounded-lg'
+                style={{
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.2), 0 10px 10px rgba(0,0,0,0.15)',
+                  transform: 'rotateX(5deg)',
+                  transformStyle: 'preserve-3d',
+                }}>
+                <div className='p-2 relative' style={{ transform: 'translateZ(20px)' }}>
+                  <Image
+                    src='/images/complete_image.JPG'
+                    alt='complete'
+                    width={800}
+                    height={600}
+                    className='object-contain rounded-md'
+                    style={{
+                      boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
+                      transform: 'translateZ(10px)',
+                    }}
+                  />
+                </div>
+                <div
+                  className='absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-amber-800 rounded-t-lg'
+                  style={{ transform: 'translateZ(5px) translateX(-50%)' }}></div>
+              </div>
             </motion.div>
 
             {/* 紙吹雪アニメーション */}
@@ -159,7 +186,7 @@ export default function CompletePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 1 }}
-              className='flex gap-4 flex-wrap justify-center'>
+              className='flex mt-4 gap-4 flex-wrap justify-center'>
               <button
                 onClick={handleDownload}
                 className='px-8 py-3 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all hover:shadow-xl active:scale-95 flex items-center gap-2'
@@ -168,8 +195,8 @@ export default function CompletePage() {
                 コンプリート画像を保存
               </button>
 
-              <div className='flex-1 p-4 shadow-md rounded-lg gap-2'>
-                <p className='w-full text-sm text-gray-600'>↓名古屋鉄道スタッフ専用</p>
+              <div className='flex-1 p-4 my-6 bg-gray-100 shadow-lg rounded-lg gap-2'>
+                <p className='w-full text-sm text-gray-600'>↓名古屋鉄道スタッフ専用ボタン</p>
                 <button
                   onClick={handleExchange}
                   disabled={isExchanged || isLoading}
