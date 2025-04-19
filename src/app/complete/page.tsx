@@ -5,9 +5,11 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
+import Lottie from 'lottie-react';
 
 export default function CompletePage() {
   const supabase = createClientComponentClient();
+  const [fireworks, setFireworks] = useState(null);
   const [isExchanged, setIsExchanged] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -55,6 +57,13 @@ export default function CompletePage() {
     checkExchangeStatus();
   }, [supabase]);
 
+  useEffect(() => {
+    fetch('/lottie/hanabi.json')
+      .then((res) => res.json())
+      .then((data) => setFireworks(data))
+      .catch((e) => console.error('Lottie JSON 読み込みエラー:', e));
+  }, []);
+
   const handleDownload = async () => {
     const response = await fetch('/images/complete_image.JPG');
     const blob = await response.blob();
@@ -76,21 +85,24 @@ export default function CompletePage() {
       </header>
 
       {/* メインコンテンツ */}
-      <main className='flex flex-col items-center justify-center gap-4 mt-24 mb-8'>
+      <main className='relative flex flex-col items-center justify-center gap-4 mt-24 mb-8'>
+        {/* Lottie fireworks */}
+        {fireworks && (
+          <div className='absolute inset-0 z-0 pointer-events-none'>
+            <Lottie animationData={fireworks} loop autoPlay style={{ width: '100%', height: '100%' }} />
+          </div>
+        )}
+
         {/* おめでとうメッセージ */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className='text-center relative z-0'>
-          <h1 className='text-3xl font-bold text-blue-600 mb-4 relative z-0'>
-            <span className='bg-gradient-to-r from-pink-500 via-yellow-500 to-blue-500 text-transparent bg-clip-text'>コンプリート</span>
+          <h1 className='text-2xl font-bold mb-4 relative z-0' style={{ color: '#004ea2' }}>
+            <span className='text-2xl'>🎉 コンプリート</span>
             <br />
-            <span className='relative inline-block'>
-              おめでとうございます！
-              <span className='absolute -top-2 -right-4 text-2xl animate-pulse'>🎉</span>
-              <span className='absolute -bottom-2 -left-4 text-2xl animate-pulse'>🎊</span>
-            </span>
+            <span className='relative inline-block'>おめでとうございます！</span>
           </h1>
           <p className='text-gray-600'>
             ご参加いただき
@@ -149,9 +161,9 @@ export default function CompletePage() {
           className='flex gap-4 flex-wrap justify-center'>
           <button
             onClick={handleDownload}
-            className='px-8 py-3 bg-green-500 text-white rounded-full shadow-lg hover:bg-green-600 transition-all hover:shadow-xl active:scale-95 flex items-center gap-2'>
+            className='px-8 py-3 bg-green-500 text-white text-lg rounded-full shadow-lg hover:bg-green-600 transition-all hover:shadow-xl active:scale-95 flex items-center gap-2'>
             <DownloadIcon />
-            画像を保存
+            コンプリート画像を保存
           </button>
 
           <button
@@ -164,6 +176,11 @@ export default function CompletePage() {
           </button>
 
           {/* YouTube 動画埋め込み (ミュート + 自動再生) */}
+          <p className='text-gray-600'>
+            🎵 瀬戸蔵ミュージアムのご紹介動画です
+            <br />
+            ぜひご覧ください
+          </p>
           <div className='w-full max-w-2xl mb-4 aspect-video'>
             <iframe
               className='w-full h-full'

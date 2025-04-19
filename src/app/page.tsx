@@ -7,20 +7,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
+import Lottie from 'lottie-react';
 
 // スタンプの定義
 const STAMPS = [
   // 1行目
-  { id: 1, name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'bell' },
-  { id: 2, name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
-  { id: 3, name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
-  { id: 4, name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
-  { id: 5, name: '大森・金城学院前', image: '/images/stamps/5_oomori_kinjougakuinmae.jpg', meta: 'omorikinjogakuinmae' },
-  { id: 6, name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
-  { id: 7, name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
-  { id: 8, name: '瀬戸市役所前', image: '/images/stamps/10_greencity.jpeg', meta: 'setoshiyakushomae' },
-  { id: 9, name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
-  { id: 10, name: 'Asumi_赤い電車_君とせとでん', image: '/images/stamps/9_setokura.JPG', meta: 'asumi_kimitosetoden' },
+  { id: 1, station_name: '栄町', name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'bell' },
+  { id: 2, station_name: '東大手', name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
+  { id: 3, station_name: '大曽根', name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
+  { id: 4, station_name: '喜多山', name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },
+  {
+    id: 5,
+    station_name: '大森・金城学院前',
+    name: '大森・金城学院前',
+    image: '/images/stamps/5_oomori_kinjougakuinmae.jpg',
+    meta: 'omorikinjogakuinmae',
+  },
+  { id: 6, station_name: '尾張旭', name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
+  { id: 7, station_name: '新瀬戸', name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
+  { id: 8, station_name: '瀬戸市役所前', name: '瀬戸市役所前', image: '/images/stamps/10_greencity.jpeg', meta: 'setoshiyakushomae' },
+  { id: 9, station_name: '瀬戸蔵ミュージアム', name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
+  { id: 10, station_name: '瀬戸蔵 ', name: 'Asumi_赤い電車_君とせとでん', image: '/images/stamps/9_setokura.JPG', meta: 'asumi_kimitosetoden' },
   // 2行目
   // 3行目
 ];
@@ -175,7 +182,7 @@ export default function Home() {
       if (updatedStamps.length === STAMPS.length) {
         // 少し待ってからコンプリートページに遷移
         setTimeout(() => {
-          router.push('/meitetsu/complete');
+          router.push('/complete');
         }, 2000);
       }
     }
@@ -196,10 +203,6 @@ export default function Home() {
 
   return (
     <div className='min-h-screen bg-white flex flex-col'>
-      {/* ヘッダー部分 */}
-      {/* <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl'>
-      </header> */}
-
       {/* メインコンテンツ */}
       <main className='flex-1 flex flex-col items-center mb-12 pb-24 overflow-y-auto'>
         <div className='overflow-hidden shadow-lg hover:shadow-xl transition-shadow'>
@@ -277,34 +280,39 @@ export default function Home() {
 
           <div className='grid grid-cols-3 gap-4'>
             {STAMPS.map((stamp, index) => (
-              <div key={stamp.id} className='relative rounded-full overflow-hidden'>
+              <div key={stamp.id} className='relative rounded-md overflow-hidden'>
                 {/* 線路の描画（最後のスタンプ以外） */}
                 {index < STAMPS.length - 1 && <div className='absolute top-1/2 left-[calc(100%_-_8px)] w-[calc(100%_+_16px)] h-2 -z-10 track-bg' />}
 
                 {/* スタンプ */}
-                <div
-                  className={`aspect-square rounded-lg border-0 ${collectedStamps.includes(stamp.id) ? 'border-gray-600' : 'border-gray-300'} overflow-hidden group relative`}>
+                <div className={`aspect-square rounded-md overflow-hidden group relative`}>
                   <Image
                     src={stamp.image}
                     alt={stamp.name}
                     fill
-                    className={`object-cover transition-opacity duration-300 ${collectedStamps.includes(stamp.id) ? 'opacity-100' : 'opacity-20'}`}
+                    className={`object-cover transition-opacity duration-300 ${collectedStamps.includes(stamp.id) ? 'opacity-100' : 'opacity-5'}`}
                   />
-                  {collectedStamps.includes(stamp.id) && (
+                  {collectedStamps.includes(stamp.id) ? (
                     <button
                       onClick={() => handleDownload(stamp)}
                       className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
                       <DownloadIcon className='w-6 h-6 text-white opacity-0 group-hover:opacity-100' />
                     </button>
+                  ) : (
+                    <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300'>
+                      <span className='text-gray-500 text-4xl font-bold opacity-70'>?</span>
+                    </div>
                   )}
                 </div>
 
                 {/* 駅名 */}
-                {/* <div className='text-center'>
-                  <span className={`${collectedStamps.includes(stamp.id) ? 'text-blue-600' : 'text-gray-500'}`} style={{ fontSize: '10px' }}>
-                    {stamp.name}
+                <div className='text-center'>
+                  <span
+                    className={`${collectedStamps.includes(stamp.id) ? 'text-blue-600' : 'text-gray-500'}`}
+                    style={{ fontSize: '10px', lineHeight: 0.8 }}>
+                    {stamp.station_name}
                   </span>
-                </div> */}
+                </div>
               </div>
             ))}
           </div>
@@ -335,7 +343,7 @@ export default function Home() {
       {/* スタンプ獲得アニメーション */}
       <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
       {/* テスト用: localStorageリセットボタン */}
-      <div className='fixed bottom-20 left-0 right-0 flex justify-center z-50'>
+      <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50'>
         <button
           onClick={() => {
             localStorage.removeItem(STORAGE_KEY);
@@ -343,6 +351,9 @@ export default function Home() {
           }}
           className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded'>
           Test: Reset Stamps
+        </button>
+        <button onClick={() => router.push('/complete')} className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded'>
+          Test: コンプリート画面へ
         </button>
       </div>
     </div>
@@ -358,14 +369,9 @@ const DownloadIcon = ({ className }: { className?: string }) => (
 
 // スタンプ獲得アニメーション
 const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete: () => void }> = ({ stamp, onComplete }) => {
-  // 電車アニメーション & スタンプ拡大切り替え用 state
   const [showTrain, setShowTrain] = useState(true);
   const [showStamp, setShowStamp] = useState(false);
-  // 効果音再生
-  // useEffect(() => {
-  //   const audio = new Audio('/sounds/acquired.mp3');
-  //   audio.play().catch((err) => console.error('音声再生エラー:', err));
-  // }, []);
+  const [fireworksData, setFireworksData] = useState<object | null>(null);
   // 電車アニメーション完了後にスタンプ表示へ
   useEffect(() => {
     if (showTrain) {
@@ -376,6 +382,15 @@ const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete
       return () => clearTimeout(timer);
     }
   }, [showTrain]);
+  // showStamp開始時に花火JSONをロード
+  useEffect(() => {
+    if (showStamp) {
+      fetch('/lottie/hanabi.json')
+        .then((res) => res.json())
+        .then((data) => setFireworksData(data))
+        .catch((err) => console.error('Lottie JSON 読み込みエラー:', err));
+    }
+  }, [showStamp]);
   // スタンプ表示後に1秒拡大＋バウンス → 2秒停止後に完了コール
   useEffect(() => {
     if (showStamp) {
@@ -383,6 +398,7 @@ const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete
       return () => clearTimeout(completeTimer);
     }
   }, [showStamp, onComplete]);
+
   return (
     <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 backdrop-blur-sm'>
       {showTrain && (
@@ -405,10 +421,15 @@ const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete
           initial={{ scale: 0 }}
           animate={{ scale: [0, 1, 0.8, 1] }}
           transition={{ scale: { times: [0, 0.75, 0.9, 1], duration: 1, ease: 'easeOut' } }}
-          className='relative'
+          className='relative z-10'
           style={{ opacity: 1 }}>
+          {fireworksData && (
+            <div className='absolute inset-0 z-0 pointer-events-none'>
+              <Lottie animationData={fireworksData} loop={false} />
+            </div>
+          )}
           <div className='absolute inset-0 bg-red-600 opacity-0 animate-stamp rounded-2xl' />
-          <Image src={stamp.image} alt={stamp.name} width={300} height={300} className='rounded-2xl shadow-2xl' />
+          <Image src={stamp.image} alt={stamp.station_name} width={320} height={320} className='rounded-2xl shadow-2xl' />
         </motion.div>
       )}
     </div>

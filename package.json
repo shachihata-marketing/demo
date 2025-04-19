@@ -12,6 +12,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.49.4",
     "framer-motion": "^12.6.3",
+    "lottie-react": "^2.4.1",
     "next": "15.1.7",
     "react": "^19.0.0",
     "react-confetti": "^6.4.0",
