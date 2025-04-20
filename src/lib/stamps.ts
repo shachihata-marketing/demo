@@ -14,13 +14,13 @@ export const STAMPS = [
   },
   { id: 6, station_name: '尾張旭', name: '尾張旭', image: '/images/stamps/6_owariasahi.jpeg', meta: 'owariasahi' },
   { id: 7, station_name: '新瀬戸', name: '新瀬戸', image: '/images/stamps/7_shinseto.jpg', meta: 'shinseto' },
-  { id: 8, station_name: '瀬戸市役所前', name: '瀬戸市役所前', image: '/images/stamps/10_greencity.jpeg', meta: 'setoshiyakushomae' },
+  { id: 8, station_name: '瀬戸市役所前', name: '瀬戸市役所前', image: '/images/stamps/8_owariseto.jpg', meta: 'setoshiyakushomae' },
   { id: 9, station_name: '瀬戸蔵ミュージアム', name: '瀬戸蔵ミュージアム', image: '/images/stamps/9_setokura.JPG', meta: 'setogura_museum' },
   {
     id: 10,
     station_name: '尾張旭まち案内 ',
     name: 'Asumi_赤い電車_君とせとでん',
-    image: '/images/stamps/9_setokura.JPG',
+    image: '/images/stamps/10_greencity.jpeg',
     meta: 'asumi_kimitosetoden',
   },
 ]; 
