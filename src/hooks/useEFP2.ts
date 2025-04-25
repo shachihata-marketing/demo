@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 const efp2ModuleUrl =
   "https://websdk-v2-cdn.evixar.com/sdk/efpkit2/2.1/efpkit2.js" // FingerPrint SDK CDNのURL
 const fpUrl =
-  "https://websdk-v2-cdn.evixar.com/fingerprint/shachihata_setosen_2025/1/packed.db" // FingerPrintデータのURL
+  "https://websdk-v2-cdn.evixar.com/fingerprint/shachihata_setosen_2025/2/packed.db" // FingerPrintデータのURL
 
 // 以下は変更しないでください。
 let stream: MediaStream | null = null

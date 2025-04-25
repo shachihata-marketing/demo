@@ -263,11 +263,15 @@ export default function CompletePage() {
               </div>
 
               <div className='flex-1 w-full p-4 my-6 bg-gray-100 shadow-lg rounded-lg gap-2'>
-                <p className='w-full text-sm text-gray-600'>景品受け取り方法</p>
+                <p className='w-full text-sm font-bold text-gray-600'>コンプリートカード受け取り方法</p>
+                <p className='w-full text-xs mt-4 text-gray-600'>
+                  尾張瀬戸駅出札窓口で、記念乗車券に 付属しているコンプリートカード引換券と、 この画面を一緒に提示してください。
+                </p>
               </div>
 
               <div className='flex-1 w-full p-4 my-6 bg-gray-100 shadow-lg rounded-lg gap-2'>
-                <p className='w-full text-sm text-gray-600'>↓名古屋鉄道スタッフ専用ボタン</p>
+                <p className='w-full text-sm text-gray-600'>↓係員用 交換確認ボタン</p>
+                <p className='w-full text-xs mt-4 text-gray-600'>お客さま自身で操作しないでください。</p>
                 <button
                   onClick={handleExchange}
                   disabled={isExchanged || isLoading}
