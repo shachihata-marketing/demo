@@ -37,14 +37,19 @@ export const useEFP2 = (apiKey: string) => {
   }, [])
 
   const handleSwitchRec = async () => {
+    console.log("handleSwitchRec called, current isRec:", isRec)
     try {
       if (isRec) {
+        // 停止処理の前に状態を更新（UIをすぐに反映するため）
+        setIsRec(false)
+        console.log("Stopping recording...")
         await recordStop()
       } else {
         if (micPermission === 'denied') {
           setError('マイクの使用が許可されていません。ブラウザの設定から許可してください。')
           return
         }
+        console.log("Starting recording...")
         await recordStart()
       }
     } catch (error) {
@@ -86,7 +91,9 @@ export const useEFP2 = (apiKey: string) => {
       await handleMediaDevicesOpened(mediaStream)
       console.log("audio stream on")
       setMeta(null)
+      // 状態更新を確実に実行
       setIsRec(true)
+      console.log("isRec set to true")
       setError(null)
     } catch (error) {
       console.error("audio stream failed:", error)
@@ -107,8 +114,11 @@ export const useEFP2 = (apiKey: string) => {
         recognier = null
       }
       console.log("audio stream off")
+      // 念のための二重保証として、ここでも状態更新
       setIsRec(false)
+      console.log("isRec set to false")
       setError(null)
+      return Promise.resolve()
     } catch (error) {
       console.error("audio stream stop failed:", error)
       setError("音声ストリームの停止に失敗しました")
@@ -140,6 +150,11 @@ export const useEFP2 = (apiKey: string) => {
       }
     }
   }
+
+  // デバッグ用: isRecの変更を監視
+  useEffect(() => {
+    console.log("isRec state changed:", isRec)
+  }, [isRec])
 
   return { meta, isRec, handleSwitchRec, micPermission, error }
 }

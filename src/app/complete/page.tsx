@@ -13,62 +13,94 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 export default function CompletePage() {
   const supabase = createClientComponentClient();
   const [fireworks, setFireworks] = useState(null);
-  const [collectedStamps, setCollectedStamps] = useState<number[]>(() => {
+  const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
+  const [isExchanged, setIsExchanged] = useState<boolean>(() => {
     try {
-      const s = localStorage.getItem('collectedStamps');
-      return s ? JSON.parse(s) : [];
+      const exchanged = localStorage.getItem('isExchanged');
+      return exchanged === 'true';
     } catch {
-      return [];
+      return false;
     }
   });
-  const [isExchanged, setIsExchanged] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showFireworks, setShowFireworks] = useState(true);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const handleExchange = async () => {
-    try {
-      setIsLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  // ユーザー情報とスタンプ状態を読み込み
+  useEffect(() => {
+    const loadUserAndStamps = async () => {
+      try {
+        // ユーザー情報取得
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
 
-      if (!user) {
-        console.error('ユーザーが見つかりません');
-        return;
+        setUserId(user.id);
+
+        // user_stampsテーブルからスタンプを取得
+        const { data: stampData } = await supabase.from('user_stamps').select('stamps').eq('user_id', user.id).single();
+
+        if (stampData?.stamps) {
+          setCollectedStamps(stampData.stamps);
+        }
+
+        // ユーザーのコンプリート状態を確認
+        const { data: userData } = await supabase.from('users').select('completed').eq('id', user.id).maybeSingle();
+
+        if (userData?.completed) {
+          setIsExchanged(userData.completed);
+          localStorage.setItem('isExchanged', userData.completed.toString());
+        }
+      } catch (error) {
+        console.error('ユーザーデータ読み込みエラー:', error);
       }
+    };
 
-      const { error } = await supabase.from('users').update({ completed: true }).eq('id', user.id);
+    loadUserAndStamps();
+  }, [supabase]);
 
-      if (error) {
-        console.error('更新エラー:', error);
-        return;
+  const handleExchange = () => {
+    setShowConfirmation(true);
+  };
+
+  const confirmExchange = async () => {
+    if (!userId) {
+      console.error('ユーザーIDが見つかりません');
+      setShowConfirmation(false);
+      return;
+    }
+
+    try {
+      setShowConfirmation(false);
+      setIsLoading(true);
+
+      // usersテーブルのレコードを確認
+      const { data: userData } = await supabase.from('users').select('id').eq('id', userId).maybeSingle();
+
+      if (userData) {
+        // レコードが存在する場合は更新
+        const { error } = await supabase.from('users').update({ completed: true }).eq('id', userId);
+
+        if (error) throw error;
+      } else {
+        // レコードが存在しない場合は作成
+        const { error } = await supabase.from('users').insert({ id: userId, completed: true });
+
+        if (error) throw error;
       }
 
       setIsExchanged(true);
+      localStorage.setItem('isExchanged', 'true');
     } catch (error) {
-      console.error('エラー:', error);
+      console.error('景品交換ステータス更新エラー:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    const checkExchangeStatus = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from('users').select('completed').eq('id', user.id).single();
-
-        if (data) {
-          setIsExchanged(data.completed);
-        }
-      }
-    };
-
-    checkExchangeStatus();
-  }, [supabase]);
-
+  // 花火アニメーション用Lottieデータを読み込み
   useEffect(() => {
     fetch('/lottie/hanabi.json')
       .then((res) => res.json())
@@ -76,6 +108,7 @@ export default function CompletePage() {
       .catch((e) => console.error('Lottie JSON 読み込みエラー:', e));
   }, []);
 
+  // 花火アニメーションのタイマー
   useEffect(() => {
     if (fireworks) {
       const timer = setTimeout(() => setShowFireworks(false), 4500);
@@ -83,6 +116,7 @@ export default function CompletePage() {
     }
   }, [fireworks]);
 
+  // コンプリート画像の保存/共有
   const handleDownload = async () => {
     try {
       const imagePath = '/images/complete_image.JPG';
@@ -102,18 +136,13 @@ export default function CompletePage() {
         window.URL.revokeObjectURL(url);
       }
     } catch (e: unknown) {
-      // Error オブジェクトか確認
-      if (e instanceof Error) {
-        // ユーザーがキャンセルした場合（Share canceled）を無視
-        if (e.name !== 'AbortError') {
-          console.error('Complete image save error:', e);
-        }
-      } else {
-        console.error('Complete image save error (non-error):', e);
+      if (e instanceof Error && e.name !== 'AbortError') {
+        console.error('Complete image save error:', e);
       }
     }
   };
 
+  // スタンプの保存/共有
   const handleSaveStamp = async (stamp: (typeof STAMPS)[number]) => {
     try {
       const res = await fetch(stamp.image);
@@ -132,29 +161,11 @@ export default function CompletePage() {
         window.URL.revokeObjectURL(url);
       }
     } catch (e: unknown) {
-      // Error オブジェクトか確認
-      if (e instanceof Error) {
-        // ユーザーがキャンセルした場合（Share canceled）を無視
-        if (e.name !== 'AbortError') {
-          console.error('Stamp save error:', e);
-        }
-      } else {
-        console.error('Stamp save error (non-error):', e);
+      if (e instanceof Error && e.name !== 'AbortError') {
+        console.error('Stamp save error:', e);
       }
     }
   };
-
-  useEffect(() => {
-    const loadStamps = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from('user_stamps').select('stamps').eq('user_id', user.id).single();
-      if (data?.stamps) setCollectedStamps(data.stamps);
-    };
-    loadStamps();
-  }, [supabase]);
 
   return (
     <div className='min-h-screen bg-white flex flex-col items-center justify-center p-4 relative'>
@@ -324,6 +335,24 @@ export default function CompletePage() {
               </Link>
             </main>
           </>
+        )}
+
+        {/* 確認アラート */}
+        {showConfirmation && (
+          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+            <div className='bg-white p-6 rounded-xl shadow-xl max-w-sm w-full'>
+              <h3 className='text-black text-lg font-bold mb-4'>景品交換の確認</h3>
+              <p className='mb-6 text-gray-600'>本当にコンプリートカードと景品を交換しますか？</p>
+              <div className='flex justify-end gap-3'>
+                <button onClick={() => setShowConfirmation(false)} className='px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400'>
+                  キャンセル
+                </button>
+                <button onClick={confirmExchange} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'>
+                  交換する
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
