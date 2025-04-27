@@ -7,3 +7,4 @@ useEFP2のoutputについては、page.tsxに記載しています。
 EFP2KitのCDNのURLやFingerPrintのURL、APIKEY等は変更される可能性があります。
 CDNURL, FingerPrintURLはuseEFP2.tsから、
 APIKEYはpage.tsxから変更をしてください。
+# Test commit
