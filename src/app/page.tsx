@@ -148,7 +148,7 @@ export default function Home() {
         console.error('コンプリート状態確認エラー:', error);
       }
     },
-    [supabase, STAMPS.length]
+    [supabase]
   );
 
   // ユーザー認証状態の監視
@@ -500,6 +500,7 @@ export default function Home() {
   };
 
   // リセットALLボタンの関数
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleResetAll = useCallback(async () => {
     const isConfirmed = window.confirm('全てのデータをリセットしますか？この操作は元に戻せません。');
     if (!isConfirmed) return;
