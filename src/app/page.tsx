@@ -798,11 +798,11 @@ export default function Home() {
         {/* スタンプ獲得アニメーション */}
         <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
 
-        <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4'>
+        {/* <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4'>
           <button onClick={() => router.push('/complete')} className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded'>
             Test: コンプリート画面へ
           </button>
-        </div>
+        </div> */}
         {/* テスト用: ボタン */}
         {/* コンプリート済みユーザーにのみリセットボタンを表示 */}
         {/* <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4'>
