@@ -788,7 +788,7 @@ export default function Home() {
         {/* すべてリセットボタン - 常に表示 */}
         <div className='fixed top-2 right-2 z-50'>
           <button
-            onClick={handleResetAll}
+            onClick={handleRechallenge}
             className='px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs shadow hover:bg-gray-300 transition-colors'>
             すべてリセット
           </button>
