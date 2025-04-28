@@ -93,6 +93,7 @@ export default function CompletePage() {
 
       setIsExchanged(true);
       localStorage.setItem('isExchanged', 'true');
+      localStorage.setItem('isCompleted', 'true');
     } catch (error) {
       console.error('景品交換ステータス更新エラー:', error);
     } finally {

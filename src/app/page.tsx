@@ -478,6 +478,7 @@ export default function Home() {
       }
 
       setIsCompleted(false);
+      localStorage.setItem('isExchanged', 'false');
       localStorage.setItem('isCompleted', 'false');
 
       // ユーザー体験向上のためにページをリロード
