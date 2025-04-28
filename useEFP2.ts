@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 const efp2ModuleUrl =
   "https://websdk-v2-cdn.evixar.com/sdk/efpkit2/2.1/efpkit2.js" // FingerPrint SDK CDNのURL
@@ -10,22 +10,59 @@ let stream: MediaStream | null = null
 let audioContext: AudioContext | null = null
 let audioSampleRate: number | null = null
 let recognier: Recognizer | null = null
+
 export const useEFP2 = (apiKey: string) => {
   const [meta, setMeta] = useState<string | null>(null)
   const [isRec, setIsRec] = useState(false)
+  const [micPermission, setMicPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt')
+  const [error, setError] = useState<string | null>(null)
+
+  // マイク権限の確認
+  // useEffect(() => {
+  //   const checkMicPermission = async () => {
+  //     try {
+  //       const result = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+  //       setMicPermission(result.state)
+        
+  //       result.addEventListener('change', () => {
+  //         setMicPermission(result.state)
+  //       })
+  //     } catch (error) {
+  //       console.error("マイク権限の確認エラー:", error)
+  //       setError("マイクの権限を確認できませんでした")
+  //     }
+  //   }
+
+  //   checkMicPermission()
+  // }, [])
 
   const handleSwitchRec = async () => {
-    if (isRec) {
-      recordStop()
-    } else {
-      recordStart()
+    console.log("handleSwitchRec called, current isRec:", isRec)
+    try {
+      if (isRec) {
+        // 停止処理の前に状態を更新（UIをすぐに反映するため）
+        setIsRec(false)
+        console.log("Stopping recording...")
+        await recordStop()
+      } else {
+        if (micPermission === 'denied') {
+          setError('マイクの使用が許可されていません。ブラウザの設定から許可してください。')
+          return
+        }
+        console.log("Starting recording...")
+        await recordStart()
+      }
+    } catch (error) {
+      console.error("音声認識エラー:", error)
+      setError("音声認識の開始/停止に失敗しました")
+      setIsRec(false)
     }
   }
 
   async function recordStart() {
     const userMedia = navigator.mediaDevices.getUserMedia
     if (userMedia == null) {
-      console.error("getUserMedia is not supported")
+      setError("getUserMediaがサポートされていません")
       return
     }
 
@@ -35,8 +72,8 @@ export const useEFP2 = (apiKey: string) => {
       noiseSuppression: false,
     }
 
-    if (navigator.userAgentData == undefined) {
-      // userAgentDataが使えない https://developer.mozilla.org/ja/docs/Web/API/Navigator/userAgentData
+    // iOS devices need different audio configuration
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
       audioConfig.echoCancellation = true
       audioConfig.autoGainControl = true
       audioConfig.noiseSuppression = true
@@ -46,32 +83,47 @@ export const useEFP2 = (apiKey: string) => {
       audioConfig.noiseSuppression = true
     }
 
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: false,
-      audio: audioConfig,
-    })
     try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: audioConfig,
+      })
       await handleMediaDevicesOpened(mediaStream)
       console.log("audio stream on")
       setMeta(null)
+      // 状態更新を確実に実行
       setIsRec(true)
-    } catch {
-      console.log("audio stream failed")
+      console.log("isRec set to true")
+      setError(null)
+    } catch (error) {
+      console.error("audio stream failed:", error)
+      setError("音声ストリームの開始に失敗しました")
+      throw error
     }
   }
 
   function recordStop() {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop())
-      audioContext?.close()
+    try {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop())
+        audioContext?.close()
 
-      stream = null
-      audioContext = null
-      audioSampleRate = null
-      recognier = null
+        stream = null
+        audioContext = null
+        audioSampleRate = null
+        recognier = null
+      }
+      console.log("audio stream off")
+      // 念のための二重保証として、ここでも状態更新
+      setIsRec(false)
+      console.log("isRec set to false")
+      setError(null)
+      return Promise.resolve()
+    } catch (error) {
+      console.error("audio stream stop failed:", error)
+      setError("音声ストリームの停止に失敗しました")
+      throw error
     }
-    console.log("audio stream off")
-    setIsRec(false)
   }
 
   const handleMediaDevicesOpened = async (_stream: MediaStream) => {
@@ -99,7 +151,12 @@ export const useEFP2 = (apiKey: string) => {
     }
   }
 
-  return { meta, isRec, handleSwitchRec }
+  // デバッグ用: isRecの変更を監視
+  useEffect(() => {
+    console.log("isRec state changed:", isRec)
+  }, [isRec])
+
+  return { meta, isRec, handleSwitchRec, micPermission, error }
 }
 
 async function importEFP2() {
