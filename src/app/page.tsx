@@ -275,12 +275,12 @@ export default function Home() {
       }
 
       console.log('完了状態の定期チェックを実行します');
-      checkCompletedStatus(user.id);
+      // checkCompletedStatus(user.id);
     }, CHECK_INTERVAL_MS);
 
     // 初回チェック（リセットフラグをチェックして実行）
     if (!isResetting()) {
-      checkCompletedStatus(user.id);
+      // checkCompletedStatus(user.id);
     }
 
     return () => {
@@ -788,7 +788,7 @@ export default function Home() {
         {/* すべてリセットボタン - 常に表示 */}
         <div className='fixed top-2 right-2 z-50'>
           <button
-            onClick={handleRechallenge}
+            onClick={handleResetAll}
             className='px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs shadow hover:bg-gray-300 transition-colors'>
             すべてリセット
           </button>
@@ -966,7 +966,7 @@ const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete
               <Lottie animationData={fireworksData} loop={false} />
             </div>
           )}
-          <div className='absolute inset-0 bg-red-600 opacity-0 animate-stamp rounded-2xl' />
+          <div className='absolute inset-0 opacity-0 animate-stamp rounded-2xl' />
           <Image src={stamp.image} alt={stamp.station_name} width={320} height={320} className='rounded-2xl shadow-2xl' />
         </motion.div>
       )}
