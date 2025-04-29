@@ -770,7 +770,7 @@ export default function Home() {
               <button
                 className={`w-full h-12 rounded-full flex items-center justify-center ${
                   isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'
-                } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto`}
+                } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto ${location && 'text-white'}`}
                 onClick={handleAudioDetection}>
                 <span className='text-xl'>{isRec ? '停止' : '📢 音響検知スタート'}</span>
               </button>
