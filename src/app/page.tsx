@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
-import { useEFP2 } from '@/hooks/useEFP2';
+import { useEFP2 } from '../../useEFP2';
 import Image from 'next/image';
 import { STAMPS } from '@/lib/stamps';
 
@@ -364,7 +364,9 @@ export default function Home() {
 
       const { error } = await supabase.auth.signInAnonymously();
 
-      if (error) throw error;
+      if (error) {
+        alert('電波の良いところでやり直してください');
+      }
 
       // サインイン成功したら自動サインインを許可
       localStorage.setItem('allowAutoSignIn', 'true');
@@ -768,11 +770,8 @@ export default function Home() {
               <button
                 className={`w-full h-12 rounded-full flex items-center justify-center ${
                   isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'
-                } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl ${
-                  !location || !!locationError ? 'opacity-50' : ''
-                } max-w-sm mx-auto`}
-                onClick={handleAudioDetection}
-                disabled={!location || !!locationError}>
+                } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto`}
+                onClick={handleAudioDetection}>
                 <span className='text-xl'>{isRec ? '停止' : '📢 音響検知スタート'}</span>
               </button>
             )
