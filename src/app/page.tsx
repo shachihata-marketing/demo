@@ -362,37 +362,45 @@ export default function Home() {
         return;
       }
 
-      const { error } = await supabase.auth.signInAnonymously();
-
-      if (error) {
-        alert('電波の良いところでやり直してください');
-      }
-
-      // サインイン成功したら自動サインインを許可
-      localStorage.setItem('allowAutoSignIn', 'true');
-      setAllowAutoSignIn(true);
-
-      // マイク許可を要求
+      // マイク許可を先に要求
+      let micPermissionGranted = false;
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           // マイクへのアクセスを要求
           await navigator.mediaDevices.getUserMedia({ audio: true });
           console.log('マイク許可が成功しました');
           setMicPermissionDenied(false);
-          await handleSwitchRec();
+          micPermissionGranted = true;
         } catch (micError) {
           console.error('マイク許可エラー:', micError);
-          // マイク許可拒否の場合、ログアウトして再度スタートからやり直し
           setMicPermissionDenied(true);
           setShowPermissionGuide(true);
-
-          // ログアウト処理
-          await supabase.auth.signOut();
-          setUser(null); // ユーザー状態をクリア
+          setIsLoading(false);
+          return; // マイク許可がないなら認証しない
         }
+      }
+
+      // マイク許可が得られたら認証処理
+      if (micPermissionGranted) {
+        const { error } = await supabase.auth.signInAnonymously();
+
+        if (error) {
+          console.error('認証エラー:', error);
+          alert('電波の良いところでやり直してください');
+          setIsLoading(false);
+          return;
+        }
+
+        // サインイン成功したら自動サインインを許可
+        localStorage.setItem('allowAutoSignIn', 'true');
+        setAllowAutoSignIn(true);
+
+        // 音声認識を開始
+        await handleSwitchRec();
       }
     } catch (error) {
       console.error('匿名認証エラー:', error);
+      alert('エラーが発生しました。再度試してください。');
     } finally {
       setIsLoading(false);
     }
@@ -641,8 +649,8 @@ export default function Home() {
             )}
           </div> */}
 
-          <div className='w-full mt-4 bg-yellow-100 border border-red-400 text-gray-700 px-4 py-3 rounded relative' role='alert'>
-            <p className='text-md font-bold'>参加中のお客様へ</p>
+          <div className='w-full mt-6 bg-yellow-100 border border-red-400 text-gray-700 px-4 py-3 rounded relative' role='alert'>
+            <p className='text-lg font-bold'>参加中のお客様へご案内</p>
             <p className='text-sm my-2'>
               ① 最初の栄町駅では<span className='font-bold text-lg'>電車出発予定時刻の1分前</span>までに
               <span className='font-bold text-lg text-[#004ea2]'>「スタートボタン」</span>
