@@ -54,7 +54,7 @@ export default function Home() {
     }
   });
 
-  const { meta, isRec, handleSwitchRec, error: audioError } = useEFP2(APIKEY);
+  const { meta, isRec, handleSwitchRec } = useEFP2(APIKEY);
 
   // デバッグ用：isRec状態変更の監視
   useEffect(() => {
@@ -734,7 +734,7 @@ export default function Home() {
         </main>
 
         {/* マイク許可のガイドモーダル */}
-        {showPermissionGuide && (
+        {showPermissionGuide && micPermissionDenied && (
           <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto'>
             <div className='bg-white p-6 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto my-4'>
               <h3 className='text-xl font-bold mb-4 text-black'>マイク許可の設定方法</h3>
