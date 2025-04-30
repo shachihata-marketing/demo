@@ -1,7 +1,7 @@
 // スタンプの定義
 export const STAMPS = [
   // 1行目
-  { id: 1, station_name: '栄町', name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'bell' },
+  { id: 1, station_name: '栄町発車前のベル音', name: '発車ベル音', image: '/images/stamps/1_sakaemachi.jpg', meta: 'bell' },
   { id: 2, station_name: '東大手', name: '東大手', image: '/images/stamps/2_higashioote.JPG', meta: 'higashiote' },
   { id: 3, station_name: '大曽根', name: '大曽根', image: '/images/stamps/3_oosone.JPG', meta: 'ozone' },
   { id: 4, station_name: '喜多山', name: '喜多山', image: '/images/stamps/4_kitayama.jpg', meta: 'kitayama' },

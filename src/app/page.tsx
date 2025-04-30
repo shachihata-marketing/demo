@@ -23,10 +23,10 @@ export default function Home() {
   const APIKEY =
     'C8w5IdiLDykjCe2Y3kESlzpvFtPxSOyX7wlqJTllFdKHy02IGNmVwMerhQJD6S8ek0zueOdaLEpnL5u25WqYZb5516tGVZcGUrJcgRL6s1veg8d8t7izQqToN/wlbNi1oQNInwTy8KXFgnKxbfsd+cYYQks9JGttFQeY2WiEtZvS/+N4HNVn2u/GZGHOUAv+0oukh1L7gMLxwy6mFGPWbzu6AGUUJjr8rTkWzDuPmuHLEnU1DW+lfI5yQeVfuIab';
 
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  // const [locationError, setLocationError] = useState<string | null>(null);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(() => {
@@ -81,25 +81,25 @@ export default function Home() {
   const [newStamp, setNewStamp] = useState<(typeof STAMPS)[0] | null>(null);
 
   // 位置情報の取得（1回だけ）
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocationError('位置情報が利用できません');
-      return;
-    }
+  // useEffect(() => {
+  //   if (!navigator.geolocation) {
+  //     setLocationError('位置情報が利用できません');
+  //     return;
+  //   }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (error) => {
-        console.error('位置情報エラー:', error);
-        setLocationError('位置情報の取得に失敗しました');
-      }
-    );
-  }, []); // 依存配列を空にして1回だけ実行
+  //   navigator.geolocation.getCurrentPosition(
+  //     (position) => {
+  //       setLocation({
+  //         latitude: position.coords.latitude,
+  //         longitude: position.coords.longitude,
+  //       });
+  //     },
+  //     (error) => {
+  //       console.error('位置情報エラー:', error);
+  //       setLocationError('位置情報の取得に失敗しました');
+  //     }
+  //   );
+  // }, []);
 
   // コンプリート状態を確認する関数（独立した関数として定義）
   const checkCompletedStatus = useCallback(
@@ -379,6 +379,7 @@ export default function Home() {
           await navigator.mediaDevices.getUserMedia({ audio: true });
           console.log('マイク許可が成功しました');
           setMicPermissionDenied(false);
+          await handleSwitchRec();
         } catch (micError) {
           console.error('マイク許可エラー:', micError);
           // マイク許可拒否の場合、ログアウトして再度スタートからやり直し
@@ -600,7 +601,7 @@ export default function Home() {
             <Image src='/images/logo.png' alt='logo' width={300} height={240} className='object-contain hover:scale-105 transition-transform' />
           </div>
 
-          {(locationError || audioError) && (
+          {/* {(locationError || audioError) && (
             <div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative' role='alert'>
               <span className='block sm:inline'>{locationError || audioError}</span>
               {locationError && (
@@ -614,9 +615,9 @@ export default function Home() {
                 </button>
               )}
             </div>
-          )}
+          )} */}
 
-          <div className='text-center text-md mt-4 text-gray-700 p-4 bg-yellow-50 border-2 border-yellow-400 shadow-md animate-pulse'>
+          {/* <div className='text-center text-md mt-4 text-gray-700 p-4 bg-yellow-50 border-2 border-yellow-400 shadow-md animate-pulse'>
             <div className='flex items-center justify-center mb-2'>
               <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6 text-yellow-500 mr-2' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
                 <path
@@ -626,7 +627,7 @@ export default function Home() {
                   d='M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z'
                 />
               </svg>
-              <span className='font-bold text-yellow-700'>お知らせ</span>
+              <span className='font-bold text-yellow-700'>スタンプラリーを楽しむために</span>
             </div>
             スタンプラリーに参加するには
             <br />
@@ -638,7 +639,29 @@ export default function Home() {
                 <p className='text-sm mt-1'>ブラウザの設定からマイク許可を有効にして、再度スタートボタンを押してください。</p>
               </div>
             )}
+          </div> */}
+
+          <div className='w-full mt-4 bg-yellow-100 border border-red-400 text-gray-700 px-4 py-3 rounded relative' role='alert'>
+            <p className='text-md font-bold'>参加中のお客様へ</p>
+            <p className='text-sm my-2'>
+              ① 最初の栄町駅では<span className='font-bold text-lg'>電車出発予定時刻の1分前</span>までに
+              <span className='font-bold text-lg text-[#004ea2]'>「スタートボタン」</span>
+              を押してください
+            </p>
+            <p className='text-md mb-2'>② マイクの使用を許可してください</p>
+            <p className='text-md mb-2'>
+              ③ 下部のボタンが<span className='font-bold text-red-600 text-lg'>「赤い停止ボタン」</span>に変わっていることを確認してください
+            </p>
+            <p className='text-md mb-2'>④ 電車に乗車中はブラウザから移動しないでください</p>
           </div>
+
+          {/* <div className='w-full border border-red-400 text-gray-700 px-4 py-3 rounded relative' role='alert'>
+            <p className='text-md font-bold'>お願い</p>
+            <p className='text-xs my-2'>
+              ① 下部のボタンが<span className='font-bold text-red-600'>赤い停止ボタン</span>に変わっていることを確認してください
+            </p>
+            <p className='text-xs mb-2'>② 電車に乗車中はブラウザから移動しないでください</p>
+          </div> */}
 
           {/* スタンプと線路のグリッド */}
           <div className='w-full max-w-2xl my-4 p-4 bg-white shadow-lg'>
@@ -770,7 +793,7 @@ export default function Home() {
               <button
                 className={`w-full h-12 rounded-full flex items-center justify-center ${
                   isRec ? 'bg-red-500 hover:bg-red-600' : 'bg-[#004ea2] hover:bg-blue-600'
-                } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto ${location && 'text-white'}`}
+                } text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto`}
                 onClick={handleAudioDetection}>
                 <span className='text-xl'>{isRec ? '停止' : '📢 音響検知スタート'}</span>
               </button>
@@ -779,7 +802,7 @@ export default function Home() {
             <button
               onClick={handleAnonymousSignUp}
               disabled={isLoading}
-              className='w-full h-12 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto'>
+              className='w-full h-12 rounded-full flex items-center justify-center bg-[#004ea2] hover:bg-[#004ea2] text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto'>
               <span className='text-xl'>{isLoading ? '登録中...' : 'スタート'}</span>
             </button>
           )}
