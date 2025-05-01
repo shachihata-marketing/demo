@@ -17,6 +17,9 @@ import { STAMPS } from '@/lib/stamps';
 // ローカルストレージキー
 const STORAGE_KEY = 'collectedStamps';
 
+// テストモード設定 - デプロイ前にfalseに変更するだけで簡単にテスト機能を無効化できます
+const TEST_MODE = true; // デプロイ前に false に変更
+
 export default function Home() {
   const router = useRouter();
   const supabase = createClientComponentClient();
@@ -29,6 +32,8 @@ export default function Home() {
   // const [locationError, setLocationError] = useState<string | null>(null);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
+
+  // isCompletedはローカルストレージとの同期にのみ使用し、表示条件はcollectedStamps.lengthで判断
   const [isCompleted, setIsCompleted] = useState<boolean>(() => {
     try {
       // ローカルストレージからもコンプリート状態を確認
@@ -75,10 +80,12 @@ export default function Home() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedStamps));
     } catch (e) {
       console.error('localStorage書き込みエラー:', e);
+      // エラーでもアプリを停止させない
     }
   }, [collectedStamps]);
 
   const [newStamp, setNewStamp] = useState<(typeof STAMPS)[0] | null>(null);
+  const [showEightStampsMessage, setShowEightStampsMessage] = useState(false);
 
   // 位置情報の取得（1回だけ）
   // useEffect(() => {
@@ -317,9 +324,16 @@ export default function Home() {
         if (error) throw error;
       } catch (error) {
         console.error('スタンプ保存エラー:', error);
+        // エラーでも静かに失敗し、ローカルでは機能を継続
       }
     };
-    saveStamps();
+
+    // ネットワークエラーでもクラッシュしないようにさらにtry-catchで囲む
+    try {
+      saveStamps();
+    } catch (e) {
+      console.error('スタンプ保存実行エラー:', e);
+    }
   }, [collectedStamps, user, supabase]);
 
   // マイク許可の状態を確認する関数
@@ -408,51 +422,122 @@ export default function Home() {
 
   useEffect(() => {
     if (!meta) return;
-    const matchedStamp = STAMPS.find((stamp) => stamp.meta === meta);
-    if (matchedStamp && !collectedStamps.includes(matchedStamp.id)) {
-      const updatedStamps = [...collectedStamps, matchedStamp.id];
-      setCollectedStamps(updatedStamps);
-      setNewStamp(matchedStamp);
 
-      // 全てのスタンプを集めた場合
-      if (updatedStamps.length === STAMPS.length) {
-        // 少し待ってからコンプリートページに遷移
-        setTimeout(() => {
-          router.push('/complete');
-        }, 2000);
-      }
-    }
-  }, [meta, collectedStamps, router]);
-
-  const handleSaveStamp = async (stamp: (typeof STAMPS)[number]) => {
     try {
-      const res = await fetch(stamp.image);
-      const blob = await res.blob();
-      const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: stamp.name });
-      } else {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }
-    } catch (e: unknown) {
-      // Error オブジェクトか確認
-      if (e instanceof Error) {
-        // ユーザーがキャンセルした場合（Share canceled）を無視
-        if (e.name !== 'AbortError') {
-          console.error('Stamp save error:', e);
+      const matchedStamp = STAMPS.find((stamp) => stamp.meta === meta);
+      if (matchedStamp && !collectedStamps.includes(matchedStamp.id)) {
+        const updatedStamps = [...collectedStamps, matchedStamp.id];
+        setCollectedStamps(updatedStamps);
+        setNewStamp(matchedStamp);
+
+        // 8個目のスタンプを取得した時に特別メッセージを表示
+        if (collectedStamps.length === 7 && updatedStamps.length === 8) {
+          // 新しいスタンプのアニメーションが終わった後にお祝いメッセージを表示
+          try {
+            setTimeout(() => {
+              setShowEightStampsMessage(true);
+            }, 4000); // スタンプアニメーションが終わる時間（約4秒）後
+          } catch (error) {
+            console.error('お祝いメッセージ表示エラー:', error);
+            // エラーが発生してもスタンプ収集は継続
+          }
         }
-      } else {
-        console.error('Stamp save error (non-error):', e);
+
+        // 全てのスタンプを集めた場合
+        if (updatedStamps.length === STAMPS.length) {
+          try {
+            // 少し待ってからコンプリートページに遷移
+            setTimeout(async () => {
+              try {
+                // 遷移前にレコーディングを停止
+                if (isRec) {
+                  console.log('コンプリートページへの遷移前にレコーディングを停止します');
+                  await handleSwitchRec();
+                }
+
+                router.push('/complete');
+              } catch (e) {
+                console.error('ページ遷移エラー:', e);
+                // 遷移できない場合も静かに失敗
+              }
+            }, 2000);
+          } catch (error) {
+            console.error('コンプリートページ遷移エラー:', error);
+            // エラーが発生してもスタンプ収集は継続
+          }
+        }
       }
+    } catch (error) {
+      console.error('スタンプ処理エラー:', error);
+      // エラーが発生してもアプリを停止させない
     }
-  };
+  }, [meta, collectedStamps, router, handleSwitchRec, isRec]);
+
+  // 音響検知ボタンのハンドラー
+  const handleAudioDetection = useCallback(async () => {
+    console.log('音響検知ボタンがクリックされました。現在のisRec:', isRec);
+    await handleSwitchRec();
+    // 確実に変更が反映されるよう、少し遅延させてコンソールに状態を出力
+    setTimeout(() => {
+      console.log('音響検知ボタンクリック後 isRec:', isRec);
+    }, 500);
+  }, [isRec, handleSwitchRec]);
+
+  // スタンプ保存ハンドラー
+  const [isSharingStamp, setIsSharingStamp] = useState(false);
+
+  const handleSaveStamp = useCallback(
+    async (stamp: (typeof STAMPS)[number]) => {
+      // 既に共有操作が進行中なら早期リターン
+      if (isSharingStamp) {
+        console.log('他のスタンプの共有処理が進行中です。しばらくお待ちください。');
+        return;
+      }
+
+      try {
+        setIsSharingStamp(true);
+
+        const res = await fetch(stamp.image);
+        const blob = await res.blob();
+        const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: stamp.name });
+        } else {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }
+      } catch (e: unknown) {
+        // Error オブジェクトか確認
+        if (e instanceof Error) {
+          // ユーザーがキャンセルした場合（Share canceled）を無視
+          if (e.name !== 'AbortError') {
+            console.error('Stamp save error:', e);
+
+            // InvalidStateError (共有操作が連続して呼ばれた場合)の特別処理
+            if (e.name === 'InvalidStateError' || e.message.includes('earlier share has not yet completed')) {
+              console.log('前回の共有がまだ完了していません。しばらく待ってから再試行してください。');
+              // ここに必要なら視覚的なフィードバックを追加
+            }
+          }
+        } else {
+          console.error('Stamp save error (non-error):', e);
+        }
+      } finally {
+        // 少し遅延させて共有状態をリセット（UI操作に余裕を持たせる）
+        setTimeout(() => {
+          setIsSharingStamp(false);
+        }, 250);
+      }
+    },
+    [isSharingStamp]
+  );
 
   // initialize window size for confetti
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
@@ -477,38 +562,93 @@ export default function Home() {
   const handleRechallenge = async () => {
     try {
       setIsLoading(true);
-      // スタンプコレクションをリセット
-      localStorage.removeItem(STORAGE_KEY);
-      setCollectedStamps([]);
 
-      if (user) {
-        // Supabaseのユーザースタンプをクリア
-        await supabase.from('user_stamps').update({ stamps: [] }).eq('user_id', user.id);
-        // Completedフラグをリセット
-        await supabase.from('users').update({ completed: false }).eq('id', user.id);
+      console.log('全てのデータをリセットします...');
+
+      // リセットフラグを設定
+      localStorage.setItem('justReset', 'true');
+      sessionStorage.setItem('justReset', 'true');
+
+      // ユーザー状態をクリア
+      setUser(null);
+      setCollectedStamps([]);
+      setIsCompleted(false);
+      setAllowAutoSignIn(false);
+
+      // ローカルストレージのクリア - キーを定数として一元管理
+      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn'];
+
+      // Supabase関連の認証トークンを検出して削除リストに追加
+      const supabaseKeyPatterns = ['supabase-auth-token', 'sb-'];
+
+      // セッションとローカルストレージからキーを収集
+      [...Object.keys(localStorage), ...Object.keys(sessionStorage)].forEach((key) => {
+        if (supabaseKeyPatterns.some((pattern) => key.startsWith(pattern))) {
+          if (!keysToRemove.includes(key)) {
+            keysToRemove.push(key);
+          }
+        }
+      });
+
+      // すべてのキーを削除
+      keysToRemove.forEach((key) => {
+        try {
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        } catch (e) {
+          console.error(`キー '${key}' の削除中にエラーが発生しました:`, e);
+        }
+      });
+
+      // ユーザーIDがある場合はデータベースもリセット
+      if (user?.id) {
+        try {
+          // user_stampsテーブルのリセット
+          await supabase.from('user_stamps').upsert(
+            {
+              user_id: user.id,
+              stamps: [],
+            },
+            {
+              onConflict: 'user_id',
+            }
+          );
+
+          // usersテーブルの存在確認とリセット
+          const { data } = await supabase.from('users').select('id').eq('id', user.id).maybeSingle();
+
+          if (data) {
+            await supabase.from('users').update({ completed: false }).eq('id', user.id);
+          }
+        } catch (dbError) {
+          console.error('データベースリセット中にエラーが発生しました:', dbError);
+        }
       }
 
-      setIsCompleted(false);
-      localStorage.setItem('isExchanged', 'false');
-      localStorage.setItem('isCompleted', 'false');
+      // Supabaseからサインアウト
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.error('サインアウト中にエラーが発生しました:', signOutError);
+      }
 
-      // ユーザー体験向上のためにページをリロード
-      window.location.reload();
+      console.log('リセット完了。ページをリロードします...');
+      alert('リセットが完了しました。最初からやり直します。');
+
+      // リロード前にリセットフラグをクリア
+      setTimeout(() => {
+        localStorage.removeItem('justReset');
+        sessionStorage.removeItem('justReset');
+        window.location.reload();
+      }, 500);
     } catch (error) {
       console.error('再チャレンジエラー:', error);
+      alert('リセット中にエラーが発生しました。ページをリロードします。');
+      // エラーが発生しても強制的にリロード
+      window.location.reload();
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // 音響検知ボタンのハンドラー
-  const handleAudioDetection = async () => {
-    console.log('音響検知ボタンがクリックされました。現在のisRec:', isRec);
-    await handleSwitchRec();
-    // 確実に変更が反映されるよう、少し遅延させてコンソールに状態を出力
-    setTimeout(() => {
-      console.log('音響検知ボタンクリック後 isRec:', isRec);
-    }, 500);
   };
 
   // リセットALLボタンの関数
@@ -594,6 +734,22 @@ export default function Home() {
     }
   }, [supabase.auth, user]);
 
+  // useEffectでisCompletedの更新ロジックを追加
+  useEffect(() => {
+    // スタンプが10個集まった場合はisCompletedをtrueに設定
+    if (collectedStamps.length === STAMPS.length && !isCompleted && user) {
+      setIsCompleted(true);
+      localStorage.setItem('isCompleted', 'true');
+
+      // Supabaseにも反映
+      try {
+        supabase.from('users').upsert({ id: user.id, completed: true }).eq('id', user.id);
+      } catch (error) {
+        console.error('Completed状態の更新に失敗:', error);
+      }
+    }
+  }, [collectedStamps, isCompleted, user, supabase]);
+
   return (
     <div className='min-h-screen bg-white flex flex-col items-center'>
       <div className='w-full max-w-md mx-auto sm:max-w-lg md:max-w-2xl lg:max-w-3xl relative'>
@@ -661,6 +817,7 @@ export default function Home() {
               ③ 下部のボタンが<span className='font-bold text-red-600 text-lg'>「赤い停止ボタン」</span>に変わっていることを確認してください
             </p>
             <p className='text-md mb-2'>④ 電車に乗車中はブラウザから移動しないでください</p>
+            <p className='text-md mb-2'>⑤ ブラウザのプライベートモードではスタンプを取得できません</p>
           </div>
 
           {/* <div className='w-full border border-red-400 text-gray-700 px-4 py-3 rounded relative' role='alert'>
@@ -691,11 +848,10 @@ export default function Home() {
               <div className='inline-block bg-white transform -rotate-2'>
                 <span className='text-xl font-bold text-red-600 flex items-center'>
                   <span className='text-gray-700 bg-clip-text tracking-widest'>
-                    スタンプ<span className='text-red-600 text-3xl'>10</span>個集めて
+                    スタンプ<span className='text-red-600 text-3xl'>8</span>個以上集めて
                     <br />
                     景品をGET！
                   </span>
-                  <span className='ml-2'>✨</span>
                 </span>
               </div>
             </div>
@@ -737,6 +893,47 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+
+              {/* コンプリートページへボタン - 尾張旭まち案内の右横に配置 */}
+              {collectedStamps.length >= 8 && (
+                <div className='relative rounded-md overflow-hidden'>
+                  <motion.button
+                    onClick={async () => {
+                      // 遷移前にレコーディングを停止
+                      if (isRec) {
+                        console.log('コンプリートページへの遷移前にレコーディングを停止します');
+                        await handleSwitchRec();
+                      }
+                      router.push('/complete');
+                    }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className='aspect-square rounded-md overflow-hidden bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex flex-col items-center justify-center p-2'>
+                    <span className='text-2xl mb-1'>🎉</span>
+                    <span className='text-center text-xs'>
+                      コンプリート
+                      <br />
+                      ページへ
+                    </span>
+                    <svg
+                      className='w-4 h-4 mt-1'
+                      fill='none'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      viewBox='0 0 24 24'
+                      stroke='currentColor'>
+                      <path d='M13 7l5 5m0 0l-5 5m5-5H6'></path>
+                    </svg>
+                  </motion.button>
+                  {/* ダミーの駅名スペース（レイアウト調整用） */}
+                  <div className='text-center'>
+                    <span className='text-transparent' style={{ fontSize: '10px', lineHeight: 0.8 }}>
+                      　
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>
@@ -790,7 +987,7 @@ export default function Home() {
         {/* 音声認識ボタンまたは開始ボタン */}
         <div className='fixed px-4 bottom-4 left-0 right-0 flex justify-center sm:w-auto sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 max-w-md sm:max-w-lg'>
           {user ? (
-            isCompleted ? (
+            collectedStamps.length === STAMPS.length ? (
               <button
                 className={`w-full h-12 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm mx-auto`}
                 onClick={handleRechallenge}
@@ -828,99 +1025,172 @@ export default function Home() {
         {/* スタンプ獲得アニメーション */}
         <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
 
-        {/* <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4'>
-          <button onClick={() => router.push('/complete')} className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded'>
-            Test: コンプリート画面へ
-          </button>
-        </div> */}
-        {/* テスト用: ボタン */}
-        {/* コンプリート済みユーザーにのみリセットボタンを表示 */}
-        {/* <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4'>
-          {isCompleted && (
+        {/* 8個のスタンプ達成お祝いメッセージ */}
+        <AnimatePresence>
+          {showEightStampsMessage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className='fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70 backdrop-blur-sm'
+              onClick={() => setShowEightStampsMessage(false)}>
+              <motion.div
+                initial={{ scale: 0.5, y: 50 }}
+                animate={{ scale: 1, y: 0 }}
+                transition={{ type: 'spring', damping: 12 }}
+                className='bg-gradient-to-r from-blue-500 to-purple-600 p-6 rounded-2xl shadow-2xl text-white text-center max-w-sm mx-4'
+                onClick={(e) => e.stopPropagation()}>
+                <div className='text-5xl mb-4'>🎉</div>
+                <h2 className='text-2xl font-bold mb-3'>おめでとうございます！</h2>
+                <p className='mb-4'>8個のスタンプを集めました！</p>
+                <p className='text-sm mb-6'>これでコンプリートページで景品と交換できます！</p>
+
+                <button
+                  onClick={() => router.push('/complete')}
+                  className='bg-white text-purple-600 font-bold py-2 px-6 rounded-full hover:bg-gray-100 transform hover:scale-105 transition-all'>
+                  コンプリートページへ
+                </button>
+
+                <button
+                  onClick={() => setShowEightStampsMessage(false)}
+                  className='mt-3 text-white/80 underline text-sm block w-full hover:text-white'>
+                  あとでする
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* テスト用: スタンプ数操作ボタン */}
+        {TEST_MODE && (
+          <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 md:gap-4 flex-wrap'>
             <button
-              onClick={async () => {
-                try {
-                  // ユーザーをログアウト
-                  const supabase = createClientComponentClient();
-                  await supabase.auth.signOut();
+              onClick={() => {
+                // 8個のスタンプをランダムに選択
+                const randomStamps = [...Array(STAMPS.length)]
+                  .map((_, i) => i + 1)
+                  .sort(() => 0.5 - Math.random())
+                  .slice(0, 8);
+                setCollectedStamps(randomStamps);
 
-                  // すべてのローカルストレージをクリア
-                  localStorage.removeItem(STORAGE_KEY);
-                  localStorage.removeItem('isExchanged');
+                // ローカルストレージにも保存
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(randomStamps));
 
-                  // 自動サインインを無効化
-                  localStorage.setItem('allowAutoSignIn', 'false');
-                  setAllowAutoSignIn(false);
+                // ユーザーがログインしている場合はSupabaseにも保存
+                if (user) {
+                  supabase
+                    .from('user_stamps')
+                    .upsert({ user_id: user.id, stamps: randomStamps }, { onConflict: 'user_id' })
+                    .then(({ error }) => {
+                      if (error) console.error('スタンプ保存エラー:', error);
+                      else console.log('テスト用：8個のスタンプを設定しました');
+                    });
+                }
 
-                  // Supabaseの認証状態を完全にクリア - すべての可能性のあるキーを削除
-                  localStorage.removeItem('supabase.auth.token');
-                  localStorage.removeItem('sb-refresh-token');
-                  localStorage.removeItem('sb-access-token');
-                  localStorage.removeItem('supabase.auth.expires_at');
-                  localStorage.removeItem('supabase.auth.refresh_token');
-                  localStorage.removeItem('supabase.auth.user');
-
-                  // または、サイト固有のすべてのローカルストレージをクリア
-                  Object.keys(localStorage).forEach((key) => {
-                    if (key.startsWith('supabase') || key.startsWith('sb-')) {
-                      localStorage.removeItem(key);
-                    }
-                  });
-
-                  // 状態をリセット
-                  setCollectedStamps([]);
-                  setUser(null);
-                  setIsCompleted(false);
-
-                  // 強制的にすべてのキャッシュをクリアして完全にリロード
-                  // URLパラメータを使わない方法に変更
+                // お祝いメッセージを表示（既に8個ある場合は表示しない）
+                if (collectedStamps.length < 8) {
                   setTimeout(() => {
-                    window.location.href = '/';
-                  }, 100);
-                } catch (error) {
-                  console.error('リセットエラー:', error);
-                  // エラーが発生しても強制的にリロード
-                  window.location.reload();
+                    setShowEightStampsMessage(true);
+                  }, 500);
                 }
               }}
-              className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded md:px-6 md:py-3 md:text-lg'>
-              Test: Reset Stamps
+              className='px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-md'>
+              テスト: 8個のスタンプを設定
             </button>
-          )}
-          <button onClick={() => router.push('/complete')} className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded'>
-            Test: コンプリート画面へ
-          </button>
 
-          <div className='bg-gray-800 text-white px-2 py-1 rounded text-xs'>
-            状態: {isCompleted ? 'コンプリート済み' : '未コンプリート'} | ユーザー: {user ? '有り' : '無し'}
-          </div>
-
-          {user && (
             <button
-              onClick={async () => {
-                try {
-                  if (!user) return;
+              onClick={() => {
+                // 9個のスタンプをランダムに選択（8個+1）
+                const randomStamps = [...Array(STAMPS.length)]
+                  .map((_, i) => i + 1)
+                  .sort(() => 0.5 - Math.random())
+                  .slice(0, 9);
+                setCollectedStamps(randomStamps);
 
-                  const newCompletedState = !isCompleted;
-                  // ユーザーのコンプリート状態を切り替え
-                  await supabase.from('users').update({ completed: newCompletedState }).eq('id', user.id);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(randomStamps));
 
-                  // 状態を更新
-                  setIsCompleted(newCompletedState);
-                  localStorage.setItem('isCompleted', newCompletedState.toString());
-
-                  // フィードバック表示
-                  alert(`コンプリート状態を「${newCompletedState ? '完了' : '未完了'}」に切り替えました`);
-                } catch (error) {
-                  console.error('状態切り替えエラー:', error);
-                  alert('エラーが発生しました');
+                if (user) {
+                  supabase
+                    .from('user_stamps')
+                    .upsert({ user_id: user.id, stamps: randomStamps }, { onConflict: 'user_id' })
+                    .then(({ error }) => {
+                      if (error) console.error('スタンプ保存エラー:', error);
+                      else console.log('テスト用：9個のスタンプを設定しました');
+                    });
                 }
               }}
-              className='px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded'>
-              Test: コンプリート状態切り替え
+              className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow-md'>
+              テスト: 9個のスタンプを設定
             </button>
-          )}
-        </div> */}
+
+            <button
+              onClick={() => {
+                // 10個のスタンプを全て設定
+                const allStamps = [...Array(STAMPS.length)].map((_, i) => i + 1);
+                setCollectedStamps(allStamps);
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(allStamps));
+
+                if (user) {
+                  supabase
+                    .from('user_stamps')
+                    .upsert({ user_id: user.id, stamps: allStamps }, { onConflict: 'user_id' })
+                    .then(({ error }) => {
+                      if (error) console.error('スタンプ保存エラー:', error);
+                      else console.log('テスト用：10個のスタンプを設定しました');
+                    });
+                }
+
+                // isCompletedも更新
+                setIsCompleted(true);
+                localStorage.setItem('isCompleted', 'true');
+
+                // 自動遷移処理（本来のスタンプ収集時と同じ挙動に）
+                try {
+                  // スタンプ獲得アニメーションが表示されない場合は短い遅延で十分
+                  setTimeout(async () => {
+                    try {
+                      // 遷移前にレコーディングを停止
+                      if (isRec) {
+                        console.log('コンプリートページへの遷移前にレコーディングを停止します');
+                        await handleSwitchRec();
+                      }
+
+                      console.log('コンプリートページへ自動遷移します');
+                      router.push('/complete');
+                    } catch (e) {
+                      console.error('ページ遷移エラー:', e);
+                    }
+                  }, 1500);
+                } catch (error) {
+                  console.error('コンプリートページ遷移エラー:', error);
+                }
+              }}
+              className='px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md shadow-md'>
+              テスト: 10個のスタンプを設定
+            </button>
+
+            <button
+              onClick={() => {
+                // スタンプをリセット
+                setCollectedStamps([]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+
+                if (user) {
+                  supabase
+                    .from('user_stamps')
+                    .upsert({ user_id: user.id, stamps: [] }, { onConflict: 'user_id' })
+                    .then(({ error }) => {
+                      if (error) console.error('スタンプリセットエラー:', error);
+                      else console.log('テスト用：スタンプをリセットしました');
+                    });
+                }
+              }}
+              className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md shadow-md'>
+              テスト: スタンプリセット
+            </button>
+          </div>
+        )}
 
         {/* Confetti animation loaded dynamically on client */}
         {showConfetti && <ReactConfetti width={windowSize.width} height={windowSize.height} recycle={false} numberOfPieces={200} />}

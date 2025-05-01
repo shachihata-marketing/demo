@@ -14,6 +14,9 @@ export default function CompletePage() {
   const supabase = createClientComponentClient();
   const [fireworks, setFireworks] = useState(null);
   const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
+  const [isSharingStamp, setIsSharingStamp] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [processingStampId, setProcessingStampId] = useState<number | null>(null);
   const [isExchanged, setIsExchanged] = useState<boolean>(() => {
     try {
       const exchanged = localStorage.getItem('isExchanged');
@@ -119,7 +122,15 @@ export default function CompletePage() {
 
   // コンプリート画像の保存/共有
   const handleDownload = async () => {
+    // 既に処理中なら早期リターン
+    if (isDownloading) {
+      console.log('画像の共有処理が進行中です。しばらくお待ちください。');
+      return;
+    }
+
     try {
+      setIsDownloading(true);
+
       const imagePath = '/images/complete_image.JPG';
       const res = await fetch(imagePath);
       const blob = await res.blob();
@@ -139,13 +150,31 @@ export default function CompletePage() {
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== 'AbortError') {
         console.error('Complete image save error:', e);
+
+        // InvalidStateError の特別処理
+        if (e.name === 'InvalidStateError' || e.message.includes('earlier share has not yet completed')) {
+          console.log('前回の共有がまだ完了していません。しばらく待ってから再試行してください。');
+        }
       }
+    } finally {
+      // 少し遅延させて共有状態をリセット
+      setTimeout(() => {
+        setIsDownloading(false);
+      }, 250);
     }
   };
 
   // スタンプの保存/共有
   const handleSaveStamp = async (stamp: (typeof STAMPS)[number]) => {
+    if (isSharingStamp) {
+      console.log('他のスタンプの共有処理が進行中です。しばらくお待ちください。');
+      return;
+    }
+
     try {
+      setIsSharingStamp(true);
+      setProcessingStampId(stamp.id);
+
       const res = await fetch(stamp.image);
       const blob = await res.blob();
       const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
@@ -164,7 +193,16 @@ export default function CompletePage() {
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== 'AbortError') {
         console.error('Stamp save error:', e);
+
+        if (e.name === 'InvalidStateError' || e.message.includes('earlier share has not yet completed')) {
+          console.log('前回の共有がまだ完了していません。しばらく待ってから再試行してください。');
+        }
       }
+    } finally {
+      setTimeout(() => {
+        setIsSharingStamp(false);
+        setProcessingStampId(null);
+      }, 500);
     }
   };
 
@@ -267,10 +305,22 @@ export default function CompletePage() {
               <div className='flex mt-4 gap-4 flex-wrap justify-center'>
                 <button
                   onClick={handleDownload}
-                  className='px-8 py-3 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all hover:shadow-xl active:scale-95 flex items-center gap-2'
+                  disabled={isDownloading}
+                  className={`px-8 py-4 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-3 ${isDownloading ? 'opacity-80 cursor-wait' : ''}`}
                   style={{ backgroundColor: '#004ea2' }}>
-                  <DownloadIcon />
-                  コンプリート画像を保存
+                  {isDownloading ? (
+                    <svg className='w-6 h-6 animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                      />
+                    </svg>
+                  ) : (
+                    <DownloadIcon />
+                  )}
+                  {isDownloading ? 'ダウンロード中...' : 'コンプリート画像を保存'}
                 </button>
               </div>
 
@@ -318,12 +368,39 @@ export default function CompletePage() {
                   {collectedStamps.map((id) => {
                     const stamp = STAMPS.find((s) => s.id === id);
                     if (!stamp) return null;
+
+                    // 各スタンプ専用の処理中フラグを保持する状態変数
+                    const isThisStampSharing = isSharingStamp && processingStampId === stamp.id;
+
                     return (
                       <div
                         key={id}
-                        className='flex aspect-square rounded-md overflow-hidden relative cursor-pointer'
-                        onClick={() => handleSaveStamp(stamp)}>
+                        className={`flex aspect-square rounded-md overflow-hidden relative ${isThisStampSharing ? 'opacity-90 cursor-wait' : 'cursor-pointer active:scale-95'} transition-all duration-200`}
+                        onClick={() => !isSharingStamp && handleSaveStamp(stamp)}>
                         <Image src={stamp.image} alt={stamp.name} width={100} height={100} className='object-cover w-full h-full' />
+                        {isThisStampSharing ? (
+                          <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-50'>
+                            <svg className='w-8 h-8 text-white animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                              />
+                            </svg>
+                          </div>
+                        ) : (
+                          <div className='absolute inset-0 flex items-center justify-center'>
+                            <svg className='w-8 h-8 text-white opacity-25' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                              />
+                            </svg>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -361,7 +438,7 @@ export default function CompletePage() {
 }
 
 const DownloadIcon = () => (
-  <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+  <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
     <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' />
   </svg>
 );
