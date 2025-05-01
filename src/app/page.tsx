@@ -525,8 +525,8 @@ export default function Home() {
           try {
             const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             testStream.getTracks().forEach((track) => track.stop());
-          } catch (_) {
-            // エラー無視（リンター警告修正）
+          } catch {
+            // エラー無視（変数を完全に省略）
           }
         }
 
@@ -743,7 +743,6 @@ export default function Home() {
   };
 
   // リセットALLボタンの関数
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleResetAll = useCallback(async () => {
     const isConfirmed = window.confirm('全てのデータをリセットしますか？この操作は元に戻せません。');
     if (!isConfirmed) return;
@@ -823,7 +822,7 @@ export default function Home() {
       localStorage.removeItem('justReset');
       sessionStorage.removeItem('justReset');
     }
-  }, [supabase.auth, user]);
+  }, [supabase.auth, user, supabase]);
 
   // useEffectでisCompletedの更新ロジックを追加
   useEffect(() => {
