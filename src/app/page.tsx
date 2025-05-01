@@ -5,12 +5,12 @@ const ReactConfetti = dynamic(() => import('react-confetti'), { ssr: false });
 // CSR専用: lottie-react を SSR 無効で動的ロード
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
-import { useEFP2 } from '../../useEFP2';
+import { useEFP2 } from '@/hooks/useEFP2';
 import Image from 'next/image';
 import { STAMPS } from '@/lib/stamps';
 
@@ -481,15 +481,68 @@ export default function Home() {
     }
   }, [meta, collectedStamps, router, handleSwitchRec, isRec]);
 
+  // コンポーネント内部:
+  const isRecRef = useRef(false);
+
+  // isRec の状態が変わったときにref値も更新
+  useEffect(() => {
+    isRecRef.current = isRec;
+    console.log('isRec ref 更新:', isRecRef.current);
+  }, [isRec]);
+
   // 音響検知ボタンのハンドラー
   const handleAudioDetection = useCallback(async () => {
-    console.log('音響検知ボタンがクリックされました。現在のisRec:', isRec);
-    await handleSwitchRec();
-    // 確実に変更が反映されるよう、少し遅延させてコンソールに状態を出力
-    setTimeout(() => {
-      console.log('音響検知ボタンクリック後 isRec:', isRec);
-    }, 500);
-  }, [isRec, handleSwitchRec]);
+    // 現在の状態をref経由で取得
+    const currentIsRec = isRecRef.current;
+    console.log('音響検知ボタンがクリックされました。現在のisRec:', currentIsRec);
+
+    try {
+      if (currentIsRec) {
+        console.log('録音停止処理を開始します...');
+
+        // hookの停止処理
+        await handleSwitchRec();
+        console.log('停止処理を実行しました');
+
+        // 追加の強制停止処理
+        if (typeof window !== 'undefined' && navigator.mediaDevices) {
+          try {
+            const streams = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streams.getTracks().forEach((track) => {
+              console.log('トラックを強制停止します:', track.kind, track.id);
+              track.stop();
+            });
+            console.log('すべてのオーディオトラックを強制停止しました');
+          } catch (mediaError) {
+            console.log('メディアデバイスの停止中にエラー（無視可能）:', mediaError);
+          }
+        }
+      } else {
+        console.log('録音開始処理を開始します...');
+
+        // 開始前にクリーンアップ
+        if (typeof window !== 'undefined' && navigator.mediaDevices) {
+          try {
+            const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            testStream.getTracks().forEach((track) => track.stop());
+          } catch (_) {
+            // エラー無視（リンター警告修正）
+          }
+        }
+
+        await handleSwitchRec();
+      }
+
+      // 状態確認を遅延実行
+      setTimeout(() => {
+        // 常に最新の状態参照
+        console.log('音響検知ボタンクリック後の最終状態 isRec:', isRecRef.current);
+      }, 1000);
+    } catch (error) {
+      console.error('録音切替エラー:', error);
+      alert('録音の開始/停止に問題が発生しました。ページをリロードしてお試しください。');
+    }
+  }, [handleSwitchRec]); // isRecへの依存を削除
 
   // スタンプ保存ハンドラー
   const [isSharingStamp, setIsSharingStamp] = useState(false);

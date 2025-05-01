@@ -16,22 +16,12 @@ export const useEFP2 = (apiKey: string) => {
   const [isRec, setIsRec] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  
   const handleSwitchRec = async () => {
-    console.log("handleSwitchRec called, current isRec:", isRec)
-    try {
-      if (isRec) {
-        // 停止処理の前に状態を更新（UIをすぐに反映するため）
-        setIsRec(false)
-        console.log("Stopping recording...")
-        await recordStop()
-      } else {
-        console.log("Starting recording...")
-        await recordStart()
-      }
-    } catch (error) {
-      console.error("音声認識エラー:", error)
-      setError("音声認識の開始/停止に失敗しました")
-      setIsRec(false)
+    if (isRec) {
+      recordStop()
+    } else {
+      recordStart()
     }
   }
 
