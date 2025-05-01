@@ -18,7 +18,7 @@ import { STAMPS } from '@/lib/stamps';
 const STORAGE_KEY = 'collectedStamps';
 
 // テストモード設定 - デプロイ前にfalseに変更するだけで簡単にテスト機能を無効化できます
-const TEST_MODE = true; // デプロイ前に false に変更
+const TEST_MODE = false; // デプロイ前に false に変更
 
 export default function Home() {
   const router = useRouter();
@@ -80,7 +80,15 @@ export default function Home() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedStamps));
     } catch (e) {
       console.error('localStorage書き込みエラー:', e);
-      // エラーでもアプリを停止させない
+
+      // プライベートモード検出の試み
+      const isPrivateMode = !window.localStorage;
+
+      if (isPrivateMode) {
+        alert('プライベートブラウジングモードではスタンプラリーのデータを保存できません。通常モードでご利用ください。');
+      } else {
+        alert('データの保存に失敗しました。端末の空き容量を確認してください。');
+      }
     }
   }, [collectedStamps]);
 
@@ -514,21 +522,16 @@ export default function Home() {
           window.URL.revokeObjectURL(url);
         }
       } catch (e: unknown) {
-        // Error オブジェクトか確認
-        if (e instanceof Error) {
-          // ユーザーがキャンセルした場合（Share canceled）を無視
-          if (e.name !== 'AbortError') {
-            console.error('Stamp save error:', e);
+        // エラータイプ別のメッセージ
+        const friendlyErrorMessage = {
+          NetworkError: '画像の読み込みに失敗しました。ネットワーク接続を確認してください。',
+          SecurityError: 'セキュリティ上の理由でダウンロードできません。',
+          QuotaExceededError: '端末の空き容量が不足しています。',
+          default: '画像の保存中にエラーが発生しました。しばらくしてから再試行してください。',
+        };
 
-            // InvalidStateError (共有操作が連続して呼ばれた場合)の特別処理
-            if (e.name === 'InvalidStateError' || e.message.includes('earlier share has not yet completed')) {
-              console.log('前回の共有がまだ完了していません。しばらく待ってから再試行してください。');
-              // ここに必要なら視覚的なフィードバックを追加
-            }
-          }
-        } else {
-          console.error('Stamp save error (non-error):', e);
-        }
+        // ユーザーに通知
+        alert(friendlyErrorMessage[e instanceof Error ? e.name : 'default']);
       } finally {
         // 少し遅延させて共有状態をリセット（UI操作に余裕を持たせる）
         setTimeout(() => {
