@@ -505,13 +505,44 @@ export default function Home() {
       try {
         setIsSharingStamp(true);
 
+        // 画像を取得
         const res = await fetch(stamp.image);
+        if (!res.ok) throw new Error('画像の取得に失敗しました');
+
         const blob = await res.blob();
         const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: stamp.name });
+        // モバイルでの共有APIをサポートしているかチェック
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
+
+        console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
+        console.log('共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+
+        if (canUseShareAPI) {
+          try {
+            // 共有APIを使用
+            await navigator.share({
+              files: [file],
+              title: `${stamp.station_name}駅のスタンプ`,
+              text: `名鉄スタンプラリー「${stamp.name}」のスタンプを獲得しました！`,
+            });
+            console.log('共有成功');
+          } catch (shareError) {
+            // キャンセルの場合は静かに終了
+            if (
+              shareError instanceof Error &&
+              (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.includes('cancel'))
+            ) {
+              console.log('共有操作: キャンセルされました');
+              return;
+            }
+            console.error('共有API使用エラー:', shareError);
+            throw shareError; // キャンセル以外のエラーは下位のエラーハンドラに渡す
+          }
         } else {
+          // 共有APIが使えない場合は通常のダウンロード処理
+          console.log('共有API非対応のため、通常のダウンロード処理を実行します');
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -522,21 +553,25 @@ export default function Home() {
           window.URL.revokeObjectURL(url);
         }
       } catch (e: unknown) {
+        console.error('スタンプ保存/共有エラー:', e);
+
         // エラータイプ別のメッセージ
-        const friendlyErrorMessage = {
-          NetworkError: '画像の読み込みに失敗しました。ネットワーク接続を確認してください。',
-          SecurityError: 'セキュリティ上の理由でダウンロードできません。',
-          QuotaExceededError: '端末の空き容量が不足しています。',
+        const friendlyErrorMessage: Record<string, string> = {
+          NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
+          SecurityError: '共有機能へのアクセスが許可されていません。',
+          QuotaExceededError: '保存領域が不足しています。不要なデータを削除してください。',
+          InvalidStateError: '前回の共有がまだ完了していません。時間をおいて再度お試しください。',
           default: '画像の保存中にエラーが発生しました。しばらくしてから再試行してください。',
         };
 
         // ユーザーに通知
-        alert(friendlyErrorMessage[e instanceof Error ? e.name : 'default']);
+        const errorName = e instanceof Error ? e.name : 'default';
+        alert(friendlyErrorMessage[errorName] || friendlyErrorMessage.default);
       } finally {
         // 少し遅延させて共有状態をリセット（UI操作に余裕を持たせる）
         setTimeout(() => {
           setIsSharingStamp(false);
-        }, 250);
+        }, 1000);
       }
     },
     [isSharingStamp]

@@ -133,11 +133,41 @@ export default function CompletePage() {
 
       const imagePath = '/images/complete_image.JPG';
       const res = await fetch(imagePath);
+      if (!res.ok) throw new Error('画像の取得に失敗しました');
+
       const blob = await res.blob();
       const file = new File([blob], 'meitetsu_rally_complete.jpg', { type: blob.type });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'めいてつ瀬戸線 スタンプラリーコンプリート' });
+
+      // モバイルでの共有APIをサポートしているかチェック
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
+
+      console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
+      console.log('完了画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+
+      if (canUseShareAPI) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'めいてつ瀬戸線 スタンプラリーコンプリート',
+            text: '名鉄瀬戸線スタンプラリーをコンプリートしました！',
+          });
+          console.log('コンプリート画像共有成功');
+        } catch (shareError) {
+          // キャンセルの場合は静かに終了
+          if (
+            shareError instanceof Error &&
+            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.includes('cancel'))
+          ) {
+            console.log('完了画像共有: キャンセルされました');
+            return;
+          }
+          console.error('完了画像共有API使用エラー:', shareError);
+          throw shareError; // キャンセル以外のエラーは下位のエラーハンドラに渡す
+        }
       } else {
+        // 共有APIが使えない場合は通常のダウンロード処理
+        console.log('共有API非対応のため、通常のダウンロード処理を実行します');
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -148,19 +178,25 @@ export default function CompletePage() {
         window.URL.revokeObjectURL(url);
       }
     } catch (e: unknown) {
-      if (e instanceof Error && e.name !== 'AbortError') {
-        console.error('Complete image save error:', e);
+      console.error('コンプリート画像保存/共有エラー:', e);
 
-        // InvalidStateError の特別処理
-        if (e.name === 'InvalidStateError' || e.message.includes('earlier share has not yet completed')) {
-          console.log('前回の共有がまだ完了していません。しばらく待ってから再試行してください。');
-        }
-      }
+      // エラータイプ別のメッセージ
+      const friendlyErrorMessage: Record<string, string> = {
+        NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
+        SecurityError: '共有機能へのアクセスが許可されていません。',
+        QuotaExceededError: '保存領域が不足しています。不要なデータを削除してください。',
+        InvalidStateError: '前回の共有がまだ完了していません。時間をおいて再度お試しください。',
+        default: '画像の保存中にエラーが発生しました。しばらくしてから再試行してください。',
+      };
+
+      // ユーザーに通知
+      const errorName = e instanceof Error ? e.name : 'default';
+      alert(friendlyErrorMessage[errorName] || friendlyErrorMessage.default);
     } finally {
       // 少し遅延させて共有状態をリセット
       setTimeout(() => {
         setIsDownloading(false);
-      }, 250);
+      }, 1000);
     }
   };
 
@@ -176,11 +212,41 @@ export default function CompletePage() {
       setProcessingStampId(stamp.id);
 
       const res = await fetch(stamp.image);
+      if (!res.ok) throw new Error('スタンプ画像の取得に失敗しました');
+
       const blob = await res.blob();
       const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: stamp.name });
+
+      // モバイルでの共有APIをサポートしているかチェック
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
+
+      console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
+      console.log('スタンプ画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+
+      if (canUseShareAPI) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `${stamp.station_name}駅のスタンプ`,
+            text: `名鉄スタンプラリー「${stamp.name}」のスタンプを獲得しました！`,
+          });
+          console.log('スタンプ共有成功');
+        } catch (shareError) {
+          // キャンセルの場合は静かに終了
+          if (
+            shareError instanceof Error &&
+            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.includes('cancel'))
+          ) {
+            console.log('スタンプ共有: キャンセルされました');
+            return;
+          }
+          console.error('スタンプ共有API使用エラー:', shareError);
+          throw shareError; // キャンセル以外のエラーは下位のエラーハンドラに渡す
+        }
       } else {
+        // 共有APIが使えない場合は通常のダウンロード処理
+        console.log('共有API非対応のため、通常のダウンロード処理を実行します');
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -191,18 +257,25 @@ export default function CompletePage() {
         window.URL.revokeObjectURL(url);
       }
     } catch (e: unknown) {
-      if (e instanceof Error && e.name !== 'AbortError') {
-        console.error('Stamp save error:', e);
+      console.error('スタンプ保存/共有エラー:', e);
 
-        if (e.name === 'InvalidStateError' || e.message.includes('earlier share has not yet completed')) {
-          console.log('前回の共有がまだ完了していません。しばらく待ってから再試行してください。');
-        }
-      }
+      // エラータイプ別のメッセージ
+      const friendlyErrorMessage: Record<string, string> = {
+        NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
+        SecurityError: '共有機能へのアクセスが許可されていません。',
+        QuotaExceededError: '保存領域が不足しています。不要なデータを削除してください。',
+        InvalidStateError: '前回の共有がまだ完了していません。時間をおいて再度お試しください。',
+        default: '画像の保存中にエラーが発生しました。しばらくしてから再試行してください。',
+      };
+
+      // ユーザーに通知
+      const errorName = e instanceof Error ? e.name : 'default';
+      alert(friendlyErrorMessage[errorName] || friendlyErrorMessage.default);
     } finally {
       setTimeout(() => {
         setIsSharingStamp(false);
         setProcessingStampId(null);
-      }, 500);
+      }, 1000);
     }
   };
 
