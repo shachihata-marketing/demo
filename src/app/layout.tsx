@@ -13,14 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: '名鉄瀬戸線開業120周年記念 音鉄サウンドスタンプラリー',
-  description: '名鉄瀬戸線開業120周年を記念した音を集めるデジタルスタンプラリーです。電車の音や駅の音を聞きながらスタンプを集めましょう！',
+  title: '名鉄音鉄サウンドスタンプラリー',
+  description: '名鉄音鉄サウンドスタンプラリーアプリ',
   openGraph: {
     title: '名鉄瀬戸線開業120周年記念 音鉄サウンドスタンプラリー',
     description: '名鉄瀬戸線開業120周年を記念した音を集めるデジタルスタンプラリーです。',
     images: ['/images/logo.png'],
   },
   viewport: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no',
+  themeColor: '#004ea2',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
   themeColor: '#004ea2',
 };
 

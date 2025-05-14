@@ -1,5 +1,8 @@
 'use client';
 
+// テストモードの有効/無効を切り替えるための定数です。
+// true にするとテスト用の機能が有効になり、デプロイ前には false に変更します。
+
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -7,16 +10,34 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { STAMPS } from '@/lib/stamps';
+import DownloadIcon from '@/components/DownloadIcon';
 
+// lottie-react ライブラリをクライアントサイドでのみ動的にインポートします。
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
+/**
+ * スタンプラリーコンプリートページコンポーネント。
+ * スタンプラリーを全て完了したユーザーに表示されます。
+ * - お祝いのアニメーション (花火)
+ * - 収集した全スタンプの表示と、個別の保存・共有機能
+ * - コンプリート画像の保存・共有機能
+ * - 景品交換の状態管理と、交換処理の実行
+ * - トップページへの導線
+ */
 export default function CompletePage() {
+  // Supabaseクライアントインスタンスを作成
   const supabase = createClientComponentClient();
+  // 花火アニメーションのLottieデータ (JSON) を保持するstate
   const [fireworks, setFireworks] = useState(null);
+  // 収集済みのスタンプIDの配列を保持するstate
   const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
+  // スタンプ画像の共有処理が実行中かどうかを示すstate
   const [isSharingStamp, setIsSharingStamp] = useState(false);
+  // コンプリート画像のダウンロード/共有処理が実行中かどうかを示すstate
   const [isDownloading, setIsDownloading] = useState(false);
+  // 現在処理中 (保存/共有) のスタンプIDを保持するstate
   const [processingStampId, setProcessingStampId] = useState<number | null>(null);
+  // 景品交換が完了したかどうかを示すstate。ローカルストレージから初期値を読み込みます。
   const [isExchanged, setIsExchanged] = useState<boolean>(() => {
     try {
       const exchanged = localStorage.getItem('isExchanged');
@@ -25,12 +46,24 @@ export default function CompletePage() {
       return false;
     }
   });
+  // ローディング状態 (景品交換処理など) を示すstate
   const [isLoading, setIsLoading] = useState(false);
+  // 花火アニメーションを表示するかどうかを制御するstate
   const [showFireworks, setShowFireworks] = useState(true);
+  // 景品交換の確認ダイアログを表示するかどうかを制御するstate
   const [showConfirmation, setShowConfirmation] = useState(false);
+  // 現在ログインしているユーザーのIDを保持するstate
   const [userId, setUserId] = useState<string | null>(null);
 
-  // ユーザー情報とスタンプ状態を読み込み
+  /**
+   * useEffectフック: コンポーネントマウント時およびSupabaseクライアントインスタンス変更時に実行。
+   * ログインユーザーの情報を取得し、そのユーザーの収集済みスタンプデータと
+   * 景品交換済み (completed) 状態をSupabaseデータベースから読み込みます。
+   * - ユーザー情報 (ID) を userId state にセットします。
+   * - 収集済みスタンプのID配列を collectedStamps state にセットします。
+   * - 景品交換済み状態を isExchanged state およびローカルストレージにセットします。
+   * - 途中でエラーが発生した場合はコンソールに出力します。
+   */
   useEffect(() => {
     const loadUserAndStamps = async () => {
       try {
@@ -64,13 +97,28 @@ export default function CompletePage() {
     loadUserAndStamps();
   }, [supabase]);
 
+  /**
+   * 「景品と交換する」ボタンがクリックされたときの処理。
+   * 景品交換の確認ダイアログ (showConfirmation state) を表示します。
+   */
   const handleExchange = () => {
     setShowConfirmation(true);
   };
 
+  /**
+   * 景品交換の確認ダイアログで「交換する」ボタンがクリックされたときの非同期処理。
+   * - ユーザーIDが存在しない場合はエラーをログに出力して処理を中断します。
+   * - isLoading state を true に設定し、ローディング状態にします。
+   * - Supabaseの 'users' テーブルで、該当ユーザーの 'completed' カラムを true に更新 (またはレコードを新規作成) します。
+   * - isExchanged state を true に更新し、ローカルストレージにも保存します。
+   *   また、'isCompleted' もローカルストレージで true に設定し、スタンプラリー全体の完了状態を整合させます。
+   * - 処理中にエラーが発生した場合はコンソールに出力します。
+   * - 処理完了後 (成功・失敗問わず) に isLoading state を false に戻します。
+   */
   const confirmExchange = async () => {
     if (!userId) {
       console.error('ユーザーIDが見つかりません');
+      alert('ユーザー情報が見つからないため、処理を完了できませんでした。再度ログインしてからお試しください。');
       setShowConfirmation(false);
       return;
     }
@@ -94,17 +142,31 @@ export default function CompletePage() {
         if (error) throw error;
       }
 
-      setIsExchanged(true);
-      localStorage.setItem('isExchanged', 'true');
-      localStorage.setItem('isCompleted', 'true');
+      try {
+        setIsExchanged(true);
+        localStorage.setItem('isExchanged', 'true');
+        localStorage.setItem('isCompleted', 'true');
+      } catch (storageError) {
+        console.error('ローカルストレージへの保存に失敗:', storageError);
+        alert('景品交換の状態を端末に保存できませんでした。ページの再読み込みで正しい状態が表示されるか確認してください。');
+        // ここでは処理を中断せず、DB更新は成功していると見なす
+      }
     } catch (error) {
       console.error('景品交換ステータス更新エラー:', error);
+      alert(
+        `景品交換処理に失敗しました。通信環境をご確認の上、再度お試しください。エラー: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 花火アニメーション用Lottieデータを読み込み
+  /**
+   * useEffectフック: コンポーネントマウント時に一度だけ実行。
+   * 花火アニメーションで使用するLottieのJSONデータを非同期でフェッチし、
+   * fireworks stateにセットします。
+   * データの取得に失敗した場合はコンソールにエラーを出力します。
+   */
   useEffect(() => {
     fetch('/lottie/hanabi.json')
       .then((res) => res.json())
@@ -112,7 +174,12 @@ export default function CompletePage() {
       .catch((e) => console.error('Lottie JSON 読み込みエラー:', e));
   }, []);
 
-  // 花火アニメーションのタイマー
+  /**
+   * useEffectフック: fireworks state (Lottieデータ) の変更を監視。
+   * fireworksデータが読み込まれたら、花火アニメーションを一定時間 (4.5秒) 表示するための
+   * タイマーを設定します。指定時間経過後、showFireworks stateをfalseにしアニメーションを非表示にします。
+   * コンポーネントのアンマウント時またはfireworksデータ変更前にはタイマーをクリアします。
+   */
   useEffect(() => {
     if (fireworks) {
       const timer = setTimeout(() => setShowFireworks(false), 4500);
@@ -120,11 +187,21 @@ export default function CompletePage() {
     }
   }, [fireworks]);
 
-  // コンプリート画像の保存/共有
+  /**
+   * コンプリート画像 (complete_image.JPG) を保存または共有する非同期関数。
+   * - isDownloading state を使用して、同時に複数の処理が実行されるのを防ぎます。
+   * - 画像をフェッチし、Blobオブジェクトとして取得します。
+   * - navigator.share API (Web Share API) が利用可能なモバイル環境では、共有ダイアログを表示します。
+   *   - ユーザーが共有をキャンセルした場合は、エラーとして扱わず静かに処理を終了します。
+   *   - 共有APIの使用中にその他のエラーが発生した場合は、それをスローして上位のcatchブロックで処理させます。
+   * - 共有APIが利用できない環境 (デスクトップブラウザなど) では、画像をファイルとしてダウンロードするフォールバック処理を行います。
+   * - 処理中に発生したエラーは包括的にcatchし、エラーの種類に応じたフレンドリーなメッセージをalertでユーザーに通知します。
+   * - 処理完了後 (成功・失敗問わず)、isDownloading stateを少し遅延させてからfalseに戻します。
+   */
   const handleDownload = async () => {
     // 既に処理中なら早期リターン
     if (isDownloading) {
-      console.log('画像の共有処理が進行中です。しばらくお待ちください。');
+      // console.log('画像の共有処理が進行中です。しばらくお待ちください。');
       return;
     }
 
@@ -133,7 +210,12 @@ export default function CompletePage() {
 
       const imagePath = '/images/complete_image.JPG';
       const res = await fetch(imagePath);
-      if (!res.ok) throw new Error('画像の取得に失敗しました');
+      if (!res.ok) {
+        const errorDetail = `コンプリート画像の取得に失敗しました (HTTP ${res.status})。ファイルが見つからないか、ネットワークに問題がある可能性があります。`;
+        console.error(errorDetail);
+        alert(errorDetail);
+        throw new Error(errorDetail);
+      }
 
       const blob = await res.blob();
       const file = new File([blob], 'meitetsu_rally_complete.jpg', { type: blob.type });
@@ -142,8 +224,8 @@ export default function CompletePage() {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
 
-      console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
-      console.log('完了画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+      // console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
+      // console.log('完了画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
 
       if (canUseShareAPI) {
         try {
@@ -152,22 +234,22 @@ export default function CompletePage() {
             title: 'めいてつ瀬戸線 スタンプラリーコンプリート',
             text: '名鉄瀬戸線スタンプラリーをコンプリートしました！',
           });
-          console.log('コンプリート画像共有成功');
+          // console.log('コンプリート画像共有成功');
         } catch (shareError) {
           // キャンセルの場合は静かに終了
           if (
             shareError instanceof Error &&
-            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.includes('cancel'))
+            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.toLowerCase().includes('cancel'))
           ) {
             console.log('完了画像共有: キャンセルされました');
-            return;
+            return; // alertは表示しない
           }
           console.error('完了画像共有API使用エラー:', shareError);
           throw shareError; // キャンセル以外のエラーは下位のエラーハンドラに渡す
         }
       } else {
         // 共有APIが使えない場合は通常のダウンロード処理
-        console.log('共有API非対応のため、通常のダウンロード処理を実行します');
+        console.info('モバイルブラウザ限定サービスですが、Web Share APIが利用できませんでした。ダウンロード処理にフォールバックします。');
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -180,18 +262,28 @@ export default function CompletePage() {
     } catch (e: unknown) {
       console.error('コンプリート画像保存/共有エラー:', e);
 
-      // エラータイプ別のメッセージ
-      const friendlyErrorMessage: Record<string, string> = {
-        NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
-        SecurityError: '共有機能へのアクセスが許可されていません。',
-        QuotaExceededError: '保存領域が不足しています。不要なデータを削除してください。',
-        InvalidStateError: '前回の共有がまだ完了していません。時間をおいて再度お試しください。',
-        default: '画像の保存中にエラーが発生しました。しばらくしてから再試行してください。',
-      };
-
-      // ユーザーに通知
-      const errorName = e instanceof Error ? e.name : 'default';
-      alert(friendlyErrorMessage[errorName] || friendlyErrorMessage.default);
+      let userMessage = '画像の保存/共有中に不明なエラーが発生しました。';
+      if (e instanceof Error) {
+        if (e.message.includes('HTTP')) {
+          // fetch失敗時の自作エラーメッセージ
+          userMessage = e.message;
+        } else if (e.name === 'AbortError' || e.message.toLowerCase().includes('cancel')) {
+          // このパスは上のcatchでreturnされるため通常到達しないが念のため
+          console.log('共有操作がキャンセルされました（下位catch）。');
+          return;
+        } else {
+          // エラータイプ別のメッセージ
+          const friendlyErrorMessage: Record<string, string> = {
+            NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
+            SecurityError: 'セキュリティ上の理由で処理を実行できませんでした。ブラウザの設定を確認してください。',
+            QuotaExceededError: '端末の保存領域が不足しています。不要なデータを削除してください。',
+            InvalidStateError: '前回の操作がまだ完了していません。時間をおいて再度お試しください。',
+            default: '画像の保存/共有中にエラーが発生しました。しばらくしてから再試行してください。',
+          };
+          userMessage = friendlyErrorMessage[e.name] || friendlyErrorMessage.default;
+        }
+      }
+      alert(userMessage);
     } finally {
       // 少し遅延させて共有状態をリセット
       setTimeout(() => {
@@ -200,10 +292,19 @@ export default function CompletePage() {
     }
   };
 
-  // スタンプの保存/共有
+  /**
+   * 収集した個別のスタンプ画像を保存または共有する非同期関数。
+   * - isSharingStamp state および processingStampId state を使用して、処理の重複を防ぎ、どのスタンプが処理中かを示します。
+   * - 指定されたスタンプの画像URLから画像をフェッチし、Blobオブジェクトとして取得します。
+   * - navigator.share API が利用可能な場合はそれを使用し、そうでない場合はダウンロード処理にフォールバックします。
+   *   （詳細なロジックは handleDownload 関数と類似しています。）
+   * - エラーハンドリングも handleDownload 関数と類似の方法で行われます。
+   * - 処理完了後、isSharingStamp および processingStampId state をリセットします。
+   * @param stamp 保存または共有するスタンプオブジェクト。(STAMPS配列の要素と同じ型)
+   */
   const handleSaveStamp = async (stamp: (typeof STAMPS)[number]) => {
     if (isSharingStamp) {
-      console.log('他のスタンプの共有処理が進行中です。しばらくお待ちください。');
+      // console.log('他のスタンプの共有処理が進行中です。しばらくお待ちください。');
       return;
     }
 
@@ -212,17 +313,22 @@ export default function CompletePage() {
       setProcessingStampId(stamp.id);
 
       const res = await fetch(stamp.image);
-      if (!res.ok) throw new Error('スタンプ画像の取得に失敗しました');
+      if (!res.ok) {
+        const errorDetail = `${stamp.name}のスタンプ画像の取得に失敗しました (HTTP ${res.status})。ファイルが見つからないか、ネットワークに問題がある可能性があります。`;
+        console.error(errorDetail);
+        alert(errorDetail);
+        throw new Error(errorDetail);
+      }
 
       const blob = await res.blob();
-      const file = new File([blob], `stamp_${stamp.name}.jpg`, { type: blob.type });
+      const file = new File([blob], 'stamp_' + stamp.name + '.jpg', { type: blob.type });
 
       // モバイルでの共有APIをサポートしているかチェック
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
 
-      console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
-      console.log('スタンプ画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+      // console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
+      // console.log('スタンプ画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
 
       if (canUseShareAPI) {
         try {
@@ -231,22 +337,22 @@ export default function CompletePage() {
             title: `${stamp.station_name}駅のスタンプ`,
             text: `名鉄スタンプラリー「${stamp.name}」のスタンプを獲得しました！`,
           });
-          console.log('スタンプ共有成功');
+          // console.log('スタンプ共有成功');
         } catch (shareError) {
           // キャンセルの場合は静かに終了
           if (
             shareError instanceof Error &&
-            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.includes('cancel'))
+            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError' || shareError.message.toLowerCase().includes('cancel'))
           ) {
-            console.log('スタンプ共有: キャンセルされました');
-            return;
+            console.log(`${stamp.name}のスタンプ共有: キャンセルされました`);
+            return; // alertは表示しない
           }
-          console.error('スタンプ共有API使用エラー:', shareError);
+          console.error(`${stamp.name}のスタンプ共有API使用エラー:`, shareError);
           throw shareError; // キャンセル以外のエラーは下位のエラーハンドラに渡す
         }
       } else {
         // 共有APIが使えない場合は通常のダウンロード処理
-        console.log('共有API非対応のため、通常のダウンロード処理を実行します');
+        console.info(`モバイルブラウザ限定サービスですが、Web Share APIが利用できませんでした。${stamp.name}のスタンプをダウンロードします。`);
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -257,20 +363,28 @@ export default function CompletePage() {
         window.URL.revokeObjectURL(url);
       }
     } catch (e: unknown) {
-      console.error('スタンプ保存/共有エラー:', e);
+      console.error(`${stamp.name}のスタンプ保存/共有エラー:`, e);
 
-      // エラータイプ別のメッセージ
-      const friendlyErrorMessage: Record<string, string> = {
-        NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
-        SecurityError: '共有機能へのアクセスが許可されていません。',
-        QuotaExceededError: '保存領域が不足しています。不要なデータを削除してください。',
-        InvalidStateError: '前回の共有がまだ完了していません。時間をおいて再度お試しください。',
-        default: '画像の保存中にエラーが発生しました。しばらくしてから再試行してください。',
-      };
-
-      // ユーザーに通知
-      const errorName = e instanceof Error ? e.name : 'default';
-      alert(friendlyErrorMessage[errorName] || friendlyErrorMessage.default);
+      let userMessage = `${stamp.name}のスタンプの保存/共有中に不明なエラーが発生しました.`;
+      if (e instanceof Error) {
+        if (e.message.includes('HTTP')) {
+          userMessage = e.message;
+        } else if (e.name === 'AbortError' || e.message.toLowerCase().includes('cancel')) {
+          // このパスは上のcatchでreturnされるため通常到達しないが念のため
+          console.log(`${stamp.name}のスタンプ共有操作がキャンセルされました（下位catch）。`);
+          return;
+        } else {
+          const friendlyErrorMessage: Record<string, string> = {
+            NetworkError: 'ネットワーク接続に問題があります。接続を確認して再度お試しください。',
+            SecurityError: 'セキュリティ上の理由で処理を実行できませんでした。ブラウザの設定を確認してください。',
+            QuotaExceededError: '端末の保存領域が不足しています。不要なデータを削除してください。',
+            InvalidStateError: '前回の操作がまだ完了していません。時間をおいて再度お試しください。',
+            default: '画像の保存/共有中にエラーが発生しました。しばらくしてから再試行してください。',
+          };
+          userMessage = friendlyErrorMessage[e.name] || friendlyErrorMessage.default;
+        }
+      }
+      alert(userMessage);
     } finally {
       setTimeout(() => {
         setIsSharingStamp(false);
@@ -509,9 +623,3 @@ export default function CompletePage() {
     </div>
   );
 }
-
-const DownloadIcon = () => (
-  <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' />
-  </svg>
-);
