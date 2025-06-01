@@ -8,12 +8,14 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { STAMPS } from '@/lib/stamps';
 import DownloadIcon from '@/components/DownloadIcon';
+import dynamic from 'next/dynamic';
 
-// lottie-react ライブラリをクライアントサイドでのみ動的にインポートします。
-const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+// SSRを無効にしてRouletteWheelをインポート
+const RouletteWheel = dynamic(() => import('@/components/RouletteWheel'), {
+  ssr: false,
+});
 
 /**
  * スタンプラリーコンプリートページコンポーネント。
@@ -27,8 +29,6 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 export default function CompletePage() {
   // Supabaseクライアントインスタンスを作成
   const supabase = createClientComponentClient();
-  // 花火アニメーションのLottieデータ (JSON) を保持するstate
-  const [fireworks, setFireworks] = useState(null);
   // 収集済みのスタンプIDの配列を保持するstate
   const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
   // スタンプ画像の共有処理が実行中かどうかを示すstate
@@ -37,10 +37,10 @@ export default function CompletePage() {
   const [isDownloading, setIsDownloading] = useState(false);
   // 現在処理中 (保存/共有) のスタンプIDを保持するstate
   const [processingStampId, setProcessingStampId] = useState<number | null>(null);
-  // 景品交換が完了したかどうかを示すstate。ローカルストレージから初期値を読み込みます。
+  // クーポンが使用済みかどうかを示すstate。ローカルストレージから初期値を読み込みます。
   const [isExchanged, setIsExchanged] = useState<boolean>(() => {
     try {
-      const exchanged = localStorage.getItem('isExchanged');
+      const exchanged = localStorage.getItem('isCouponUsed');
       return exchanged === 'true';
     } catch {
       return false;
@@ -48,12 +48,23 @@ export default function CompletePage() {
   });
   // ローディング状態 (景品交換処理など) を示すstate
   const [isLoading, setIsLoading] = useState(false);
-  // 花火アニメーションを表示するかどうかを制御するstate
-  const [showFireworks, setShowFireworks] = useState(true);
   // 景品交換の確認ダイアログを表示するかどうかを制御するstate
   const [showConfirmation, setShowConfirmation] = useState(false);
   // 現在ログインしているユーザーのIDを保持するstate
   const [userId, setUserId] = useState<string | null>(null);
+  // ルーレットを回したかどうかを示すstate  
+  const [hasSpunRoulette] = useState<boolean>(() => {
+    try {
+      const spun = localStorage.getItem('hasSpunRoulette');
+      return spun === 'true';
+    } catch {
+      return false;
+    }
+  });
+  // ルーレットで当たった賞品
+  const [wonPrize, setWonPrize] = useState<string | null>(null);
+  // ルーレットを表示するかどうか
+  const [showRoulette, setShowRoulette] = useState(false);
 
   /**
    * useEffectフック: コンポーネントマウント時およびSupabaseクライアントインスタンス変更時に実行。
@@ -67,30 +78,77 @@ export default function CompletePage() {
   useEffect(() => {
     const loadUserAndStamps = async () => {
       try {
-        // ユーザー情報取得
+        // まずローカルストレージからデータを読み込む（即座に表示）
+        const localStamps = localStorage.getItem('collectedStamps');
+        if (localStamps) {
+          try {
+            const parsed = JSON.parse(localStamps);
+            setCollectedStamps(parsed);
+          } catch (e) {
+            console.error('ローカルストレージのパースエラー:', e);
+          }
+        }
+
+        // クーポン使用状態もローカルストレージから読み込む
+        const localCouponUsed = localStorage.getItem('isCouponUsed');
+        if (localCouponUsed === 'true') {
+          setIsExchanged(true);
+        }
+
+        // Supabaseからユーザー情報取得を試みる
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) return;
+        
+        if (!user) {
+          console.log('Supabase認証なし - ローカルモードで動作');
+          // ローカルユーザーIDを生成（クーポン使用のため）
+          const localUserId = localStorage.getItem('localUserId') || `local-user-${Date.now()}`;
+          localStorage.setItem('localUserId', localUserId);
+          setUserId(localUserId);
+          return;
+        }
 
         setUserId(user.id);
 
-        // user_stampsテーブルからスタンプを取得
-        const { data: stampData } = await supabase.from('user_stamps').select('stamps').eq('user_id', user.id).single();
+        // Supabaseからデータ取得を試みる（エラーがあってもローカルデータは保持）
+        try {
+          // user_stampsテーブルからスタンプとis_redeemedを取得
+          const { data: stampData, error } = await supabase.from('user_stamps').select('stamps, is_redeemed').eq('user_id', user.id).maybeSingle();
 
-        if (stampData?.stamps) {
-          setCollectedStamps(stampData.stamps);
-        }
+          if (error && error.code === 'PGRST116') {
+            // レコードが存在しない場合は作成
+            console.log('user_stampsレコードが存在しないため作成します');
+            const localStamps = localStorage.getItem('collectedStamps');
+            const stamps = localStamps ? JSON.parse(localStamps) : [];
+            
+            await supabase.from('user_stamps').insert({
+              user_id: user.id,
+              stamps: stamps,
+              is_completed: stamps.length === 4,
+              is_redeemed: false
+            });
+          } else if (stampData) {
+            if (stampData.stamps) {
+              setCollectedStamps(stampData.stamps);
+            }
 
-        // ユーザーのコンプリート状態を確認
-        const { data: userData } = await supabase.from('users').select('completed').eq('id', user.id).maybeSingle();
-
-        if (userData?.completed) {
-          setIsExchanged(userData.completed);
-          localStorage.setItem('isExchanged', userData.completed.toString());
+            // user_stampsテーブルからis_redeemedを確認
+            if (stampData.is_redeemed !== undefined) {
+              setIsExchanged(stampData.is_redeemed);
+              localStorage.setItem('isCouponUsed', stampData.is_redeemed.toString());
+            }
+          }
+        } catch (dbError) {
+          console.error('Supabaseデータベースエラー:', dbError);
+          // データベースエラーがあってもローカルデータで続行
         }
       } catch (error) {
         console.error('ユーザーデータ読み込みエラー:', error);
+        // エラー時もローカルユーザーIDを設定
+        const localUserId = localStorage.getItem('localUserId') || `local-user-${Date.now()}`;
+        localStorage.setItem('localUserId', localUserId);
+        setUserId(localUserId);
       }
     };
 
@@ -98,15 +156,39 @@ export default function CompletePage() {
   }, [supabase]);
 
   /**
-   * 「景品と交換する」ボタンがクリックされたときの処理。
-   * 景品交換の確認ダイアログ (showConfirmation state) を表示します。
+   * 「クーポンを使用する」ボタンがクリックされたときの処理。
+   * クーポン使用の確認ダイアログ (showConfirmation state) を表示します。
    */
   const handleExchange = () => {
     setShowConfirmation(true);
   };
+  
+  /**
+   * ルーレットを回す処理
+   */
+  const handleSpinRoulette = () => {
+    setShowRoulette(true);
+  };
+  
+  /**
+   * ルーレット完了時の処理
+   */
+  const handleRouletteComplete = (prize: string) => {
+    setWonPrize(prize);
+    
+    setTimeout(() => {
+      // ハズレの場合は別のメッセージ
+      if (prize === '😢 ハズレ') {
+        alert(`残念でした！\n\n😢 ハズレ 😢\n\nまた次回チャレンジしてください！`);
+      } else {
+        alert(`おめでとうございます！\n\n🎉 ${prize} 🎉\n\n受付でこの画面をお見せください。`);
+      }
+      setShowRoulette(false);
+    }, 500);
+  };
 
   /**
-   * 景品交換の確認ダイアログで「交換する」ボタンがクリックされたときの非同期処理。
+   * クーポン使用の確認ダイアログで「使用する」ボタンがクリックされたときの非同期処理。
    * - ユーザーIDが存在しない場合はエラーをログに出力して処理を中断します。
    * - isLoading state を true に設定し、ローディング状態にします。
    * - Supabaseの 'users' テーブルで、該当ユーザーの 'completed' カラムを true に更新 (またはレコードを新規作成) します。
@@ -118,74 +200,40 @@ export default function CompletePage() {
   const confirmExchange = async () => {
     if (!userId) {
       console.error('ユーザーIDが見つかりません');
-      alert('ユーザー情報が見つからないため、処理を完了できませんでした。再度ログインしてからお試しください。');
-      setShowConfirmation(false);
-      return;
+      // ローカルユーザーIDを再生成
+      const localUserId = `local-user-${Date.now()}`;
+      localStorage.setItem('localUserId', localUserId);
+      setUserId(localUserId);
     }
+
+    setShowConfirmation(false);
+    setIsLoading(true);
 
     try {
-      setShowConfirmation(false);
-      setIsLoading(true);
-
-      // usersテーブルのレコードを確認
-      const { data: userData } = await supabase.from('users').select('id').eq('id', userId).maybeSingle();
-
-      if (userData) {
-        // レコードが存在する場合は更新
-        const { error } = await supabase.from('users').update({ completed: true }).eq('id', userId);
-
-        if (error) throw error;
-      } else {
-        // レコードが存在しない場合は作成
-        const { error } = await supabase.from('users').insert({ id: userId, completed: true });
-
-        if (error) throw error;
-      }
-
-      try {
-        setIsExchanged(true);
-        localStorage.setItem('isExchanged', 'true');
-        localStorage.setItem('isCompleted', 'true');
-      } catch (storageError) {
-        console.error('ローカルストレージへの保存に失敗:', storageError);
-        alert('景品交換の状態を端末に保存できませんでした。ページの再読み込みで正しい状態が表示されるか確認してください。');
-        // ここでは処理を中断せず、DB更新は成功していると見なす
-      }
-    } catch (error) {
-      console.error('景品交換ステータス更新エラー:', error);
-      alert(
-        `景品交換処理に失敗しました。通信環境をご確認の上、再度お試しください。エラー: ${error instanceof Error ? error.message : String(error)}`
-      );
-    } finally {
-      setIsLoading(false);
+      // まずローカルストレージを更新（ユーザー体験優先）
+      setIsExchanged(true);
+      localStorage.setItem('isCouponUsed', 'true');
+      localStorage.setItem('isCompleted', 'true');
+    } catch (storageError) {
+      console.error('ローカルストレージへの保存に失敗:', storageError);
+      alert('クーポン使用状態を端末に保存できませんでした。ページの再読み込みで正しい状態が表示されるか確認してください。');
     }
+
+    // バックグラウンドでSupabaseを更新（エラーがあってもユーザー体験に影響しない）
+    if (userId) {
+      supabase.from('user_stamps')
+        .update({ is_redeemed: true })
+        .eq('user_id', userId)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Supabase更新エラー（バックグラウンド）:', error);
+          }
+        });
+    }
+
+    setIsLoading(false);
   };
 
-  /**
-   * useEffectフック: コンポーネントマウント時に一度だけ実行。
-   * 花火アニメーションで使用するLottieのJSONデータを非同期でフェッチし、
-   * fireworks stateにセットします。
-   * データの取得に失敗した場合はコンソールにエラーを出力します。
-   */
-  useEffect(() => {
-    fetch('/lottie/hanabi.json')
-      .then((res) => res.json())
-      .then((data) => setFireworks(data))
-      .catch((e) => console.error('Lottie JSON 読み込みエラー:', e));
-  }, []);
-
-  /**
-   * useEffectフック: fireworks state (Lottieデータ) の変更を監視。
-   * fireworksデータが読み込まれたら、花火アニメーションを一定時間 (4.5秒) 表示するための
-   * タイマーを設定します。指定時間経過後、showFireworks stateをfalseにしアニメーションを非表示にします。
-   * コンポーネントのアンマウント時またはfireworksデータ変更前にはタイマーをクリアします。
-   */
-  useEffect(() => {
-    if (fireworks) {
-      const timer = setTimeout(() => setShowFireworks(false), 4500);
-      return () => clearTimeout(timer);
-    }
-  }, [fireworks]);
 
   /**
    * コンプリート画像 (complete_image.JPG) を保存または共有する非同期関数。
@@ -208,7 +256,7 @@ export default function CompletePage() {
     try {
       setIsDownloading(true);
 
-      const imagePath = '/images/complete_image.JPG';
+      const imagePath = '/images/complete_special.png';
       const res = await fetch(imagePath);
       if (!res.ok) {
         const errorDetail = `コンプリート画像の取得に失敗しました (HTTP ${res.status})。ファイルが見つからないか、ネットワークに問題がある可能性があります。`;
@@ -218,7 +266,7 @@ export default function CompletePage() {
       }
 
       const blob = await res.blob();
-      const file = new File([blob], 'meitetsu_rally_complete.jpg', { type: blob.type });
+      const file = new File([blob], 'shachihata_zoo_complete.jpg', { type: blob.type });
 
       // モバイルでの共有APIをサポートしているかチェック
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -231,8 +279,8 @@ export default function CompletePage() {
         try {
           await navigator.share({
             files: [file],
-            title: 'めいてつ瀬戸線 スタンプラリーコンプリート',
-            text: '名鉄瀬戸線スタンプラリーをコンプリートしました！',
+            title: 'シヤチハタ動物園 スタンプラリーコンプリート',
+            text: 'シヤチハタ動物園スタンプラリーをコンプリートしました！🎉',
           });
           // console.log('コンプリート画像共有成功');
         } catch (shareError) {
@@ -334,8 +382,8 @@ export default function CompletePage() {
         try {
           await navigator.share({
             files: [file],
-            title: `${stamp.station_name}駅のスタンプ`,
-            text: `名鉄スタンプラリー「${stamp.name}」のスタンプを獲得しました！`,
+            title: `${stamp.name}のスタンプ`,
+            text: `シヤチハタ動物園「${stamp.name}」のスタンプを獲得しました！`,
           });
           // console.log('スタンプ共有成功');
         } catch (shareError) {
@@ -394,109 +442,254 @@ export default function CompletePage() {
   };
 
   return (
-    <div className='min-h-screen bg-white flex flex-col items-center justify-center p-4 relative'>
-      <div className='w-full max-w-md mx-auto sm:max-w-lg md:max-w-2xl lg:max-w-3xl relative'>
-        {showFireworks && fireworks ? (
-          <div className='fixed inset-0 flex items-center justify-center bg-white z-50'>
-            <Lottie animationData={fireworks} loop autoPlay style={{ width: '100%', height: '100%' }} />
-            <div className='absolute inset-0 flex items-center justify-center'>
-              <Image
-                src='/images/logo.png'
-                alt='logo'
-                width={180}
-                height={120}
-                className='object-contain'
-                style={{
-                  animation: 'zoom-in 4.5s ease-out forwards',
-                }}
-              />
-              <style jsx global>{`
-                @keyframes zoom-in {
-                  from {
-                    transform: scale(0);
-                  }
-                  to {
-                    transform: scale(1);
-                    width: 100%;
-                  }
-                }
-              `}</style>
-            </div>
+    <div className='min-h-screen bg-white px-4 py-8'>
+        <div className='flex items-center w-full mb-6'>
+          <motion.div
+            className='mr-3'
+          animate={{
+            y: [0, -2, 0, 2, 0],
+            rotate: [-1, 1, -1],
+          }}
+          transition={{
+            repeat: Infinity,
+            duration: 2,
+            ease: 'easeInOut',
+          }}>
+          <span className='text-4xl'>🦁</span>
+        </motion.div>
+        <div className='flex flex-col'>
+          <div className='text-gray-600 text-xl font-bold relative z-0'>
+            <span className='relative inline-block'>おめでとうございます 🎉</span>
           </div>
-        ) : (
-          <>
-            <header className='w-full py-4 px-6 flex justify-center items-center bg-white shadow-md rounded-b-3xl fixed top-0 left-0 right-0 z-10'>
-              <div className='w-full max-w-md mx-auto sm:max-w-lg md:max-w-2xl lg:max-w-3xl relative'>
-                <Image src='/images/logo.png' alt='logo' width={180} height={120} className='object-contain hover:scale-100 transition-transform' />
-              </div>
-            </header>
+          <p className='text-gray-600 text-sm'>全ての音声スタンプを集めました！記念画像はこちら👇</p>
+        </div>
+      </div>
 
-            <main className='relative flex flex-col items-center justify-center gap-2 mt-24 mb-8'>
-              <div className='flex items-center w-full mb-4'>
-                <motion.div
-                  className='mr-3'
-                  animate={{
-                    y: [0, -2, 0, 2, 0],
-                    rotate: [-1, 1, -1],
-                  }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 2,
-                    ease: 'easeInOut',
-                  }}>
-                  <Image src='/images/densha.jpg' alt='電車' width={48} height={48} className='object-contain' />
-                </motion.div>
-                <div className='flex flex-col'>
-                  <div className='text-gray-600 text-xl font-bold relative z-0'>
-                    <span className='relative inline-block'>おめでとうございます 🎉</span>
-                  </div>
-                  <p className='text-gray-600 text-sm'>コンプリート記念画像はこちらです👇</p>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+          className='relative overflow-hidden transform-gpu hover:shadow-3xl transition-all mb-6'
+          style={{
+            perspective: '1000px',
+            transformStyle: 'preserve-3d',
+          }}>
+          <div
+            className='p-4 bg-gradient-to-r from-green-100 via-yellow-100 to-green-100 border-8 border-green-600 rounded-2xl'
+          style={{
+            boxShadow: '0 15px 30px rgba(34, 197, 94, 0.3), 0 10px 15px rgba(34, 197, 94, 0.2)',
+            transform: 'rotateX(5deg)',
+            transformStyle: 'preserve-3d',
+          }}>
+          <div className='p-2 relative' style={{ transform: 'translateZ(20px)' }}>
+            <Image
+              src='/images/complete_special.png'
+              alt='complete'
+              width={800}
+              height={600}
+              className='object-contain rounded-md'
+              style={{
+                boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
+                transform: 'translateZ(10px)',
+              }}
+            />
+          </div>
+          <div
+            className='absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-amber-800 rounded-t-lg'
+            style={{ transform: 'translateZ(5px) translateX(-50%)' }}></div>
+        </div>
+      </motion.div>
+
+        <div className='flex gap-4 flex-wrap justify-center mb-8'>
+          <button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className={`px-8 py-4 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-3 ${isDownloading ? 'opacity-80 cursor-wait' : ''}`}
+            style={{ backgroundColor: '#22c55e' }}>
+            {isDownloading ? (
+              <svg className='w-6 h-6 animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' />
+              </svg>
+            ) : (
+              <DownloadIcon />
+            )}
+            {isDownloading ? 'ダウンロード中...' : 'コンプリート画像を保存'}
+          </button>
+        </div>
+
+        {/* 30%OFFクーポン */}
+        <div className='w-full mb-8 bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl shadow-xl border-2 border-orange-200'>
+        <h3 className='text-xl font-bold text-center text-orange-600 mb-4'>🎉 コンプリート特典 🎉</h3>
+        <p className='text-gray-700 text-center mb-6'>売店でご利用いただける30%OFFクーポンをプレゼント！</p>
+        
+        <div className='flex justify-center mb-6'>
+          <div className='relative'>
+            <Image
+              src='/images/coupon.png'
+              alt='30%OFFクーポン'
+              width={360}
+              height={270}
+              className='rounded-lg shadow-lg'
+            />
+            {isExchanged && (
+              <div className='absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center'>
+                <div className='bg-white px-6 py-3 rounded-full shadow-lg'>
+                  <span className='text-lg font-bold text-green-600'>✓ 使用済み</span>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
 
+        <p className='text-sm text-gray-600 text-center mb-4'>
+          売店にてこの画面を係員にお見せください
+        </p>
+
+        <div className='bg-gray-100 p-4 rounded-lg border border-gray-300'>
+          <p className='text-sm text-gray-600 text-center mb-2'>↓係員用 使用確認ボタン</p>
+          <p className='text-xs text-red-600 text-center mb-4'>来園者様自身で操作しないでください</p>
+          
+          {!isExchanged ? (
+            <button
+              onClick={handleExchange}
+              disabled={isLoading}
+              className={`w-full px-8 py-3 rounded-full shadow-lg transition-all hover:shadow-xl active:scale-95 flex items-center justify-center gap-2 ${
+                isLoading ? 'bg-yellow-500 cursor-wait' : 'bg-red-500 hover:bg-red-600'
+              } text-white`}>
+              {isLoading ? (
+                <>
+                  <svg className='w-5 h-5 animate-spin' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
+                  </svg>
+                  <span>処理中...</span>
+                </>
+              ) : (
+                <span>クーポンを使用する</span>
+              )}
+            </button>
+          ) : (
+            <div className='w-full px-8 py-3 bg-gray-300 text-gray-600 rounded-full text-center'>
+              ✓ クーポン使用済み
+            </div>
+          )}
+        </div>
+        
+        {isExchanged && (
+          <p className='text-sm text-green-600 text-center mt-4 font-semibold'>
+            素敵なお買い物ありがとうございました！
+          </p>
+        )}
+      </div>
+
+        {/* エクストラボーナスセクション */}
+        <div className='w-full mb-8 bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-xl border-2 border-purple-200'>
+          <h3 className='text-xl font-bold text-center text-purple-600 mb-4'>🎰 エクストラボーナス 🎰</h3>
+          <p className='text-gray-700 text-center mb-6'>さらに特別なプレゼントが当たるチャンス！</p>
+          
+          {!showRoulette ? (
+            <>
               <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.3 }}
-                className='relative overflow-hidden transform-gpu hover:shadow-3xl transition-all'
-                style={{
-                  perspective: '1000px',
-                  transformStyle: 'preserve-3d',
-                }}>
-                <div
-                  className='p-2 bg-gradient-to-r from-amber-100 to-amber-200 border-8 border-amber-700 rounded-lg'
-                  style={{
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.2), 0 10px 10px rgba(0,0,0,0.15)',
-                    transform: 'rotateX(5deg)',
-                    transformStyle: 'preserve-3d',
-                  }}>
-                  <div className='p-2 relative' style={{ transform: 'translateZ(20px)' }}>
-                    <Image
-                      src='/images/complete_image.JPG'
-                      alt='complete'
-                      width={800}
-                      height={600}
-                      className='object-contain rounded-md'
-                      style={{
-                        boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
-                        transform: 'translateZ(10px)',
-                      }}
-                    />
+                className='flex justify-center mb-4'
+                whileHover={!hasSpunRoulette ? { scale: 1.05 } : {}}
+                whileTap={!hasSpunRoulette ? { scale: 0.95 } : {}}>
+                {!hasSpunRoulette ? (
+                  <button
+                    onClick={handleSpinRoulette}
+                    className='px-12 py-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xl font-bold rounded-full shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3'>
+                    <span className='text-2xl'>🎲</span>
+                    <span>ルーレットを回す</span>
+                    <span className='text-2xl'>🎯</span>
+                  </button>
+                ) : (
+                  <div className='px-12 py-6 bg-gray-300 text-gray-600 text-xl font-bold rounded-full shadow-lg flex items-center gap-3'>
+                    <span className='text-2xl'>✅</span>
+                    <span>ルーレット済み</span>
+                    <span className='text-2xl'>🎁</span>
                   </div>
-                  <div
-                    className='absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-amber-800 rounded-t-lg'
-                    style={{ transform: 'translateZ(5px) translateX(-50%)' }}></div>
-                </div>
+                )}
               </motion.div>
+              
+              {wonPrize && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`mt-4 p-6 rounded-lg shadow-lg border-2 ${
+                    wonPrize === '😢 ハズレ' 
+                      ? 'bg-gradient-to-r from-gray-100 to-gray-200 border-gray-300' 
+                      : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-300'
+                  }`}>
+                  <p className={`text-center text-xl font-bold mb-3 ${
+                    wonPrize === '😢 ハズレ' ? 'text-gray-700' : 'text-purple-700'
+                  }`}>
+                    {wonPrize === '😢 ハズレ' ? '😢 残念！ 😢' : '🎊 獲得した賞品 🎊'}
+                  </p>
+                  <div className='bg-white p-4 rounded-md shadow-inner'>
+                    <p className='text-center text-2xl mb-2'>
+                      {wonPrize}
+                    </p>
+                    {wonPrize !== '😢 ハズレ' && (
+                      <p className='text-center text-sm text-gray-600'>
+                        受付でこの画面をお見せください
+                      </p>
+                    )}
+                    {wonPrize === '😢 ハズレ' && (
+                      <p className='text-center text-sm text-gray-600'>
+                        また次回チャレンジしてください！
+                      </p>
+                    )}
+                  </div>
+                  {wonPrize !== '😢 ハズレ' && (
+                    <p className='text-center text-sm text-purple-600 mt-3 font-semibold'>
+                      受付でこの画面をお見せください
+                    </p>
+                  )}
+                </motion.div>
+              )}
+            </>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className='flex justify-center'>
+              <RouletteWheel 
+                onSpinComplete={handleRouletteComplete} 
+              />
+            </motion.div>
+          )}
+          
+          <p className='text-sm text-gray-600 text-center mt-4'>
+            ※ おひとり様1回限り
+          </p>
+        </div>
 
-              <div className='flex mt-4 gap-4 flex-wrap justify-center'>
-                <button
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  className={`px-8 py-4 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-3 ${isDownloading ? 'opacity-80 cursor-wait' : ''}`}
-                  style={{ backgroundColor: '#004ea2' }}>
-                  {isDownloading ? (
-                    <svg className='w-6 h-6 animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+        <div className='w-full mb-8'>
+        <p className='text-gray-600 text-center text-lg font-semibold mb-4'>🎬 シヤチハタ動物園の魅力をご紹介！</p>
+        <div className='bg-gradient-to-br from-green-50 to-blue-50 p-6 rounded-xl shadow-md'>
+          <p className='text-gray-700 text-center mb-4'>かわいい動物たちが待っています 🐘🦒🐧</p>
+          <p className='text-gray-600 text-sm text-center'>また遊びに来てくださいね！</p>
+        </div>
+      </div>
+
+        <div className='mb-8 shadow-lg rounded-lg p-4 w-full'>
+        <h3 className='text-black text-md font-bold text-center mb-4'>✨ スタンプコレクション ✨</h3>
+        <div className='grid grid-cols-5 gap-4'>
+          {collectedStamps.map((id) => {
+            const stamp = STAMPS.find((s) => s.id === id);
+            if (!stamp) return null;
+
+            // 各スタンプ専用の処理中フラグを保持する状態変数
+            const isThisStampSharing = isSharingStamp && processingStampId === stamp.id;
+
+            return (
+              <div
+                key={id}
+                className={`flex aspect-square rounded-md overflow-hidden relative ${isThisStampSharing ? 'opacity-90 cursor-wait' : 'cursor-pointer active:scale-95'} transition-all duration-200`}
+                onClick={() => !isSharingStamp && handleSaveStamp(stamp)}>
+                <Image src={stamp.image} alt={stamp.name} width={100} height={100} className='object-cover w-full h-full' />
+                {isThisStampSharing ? (
+                  <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-50'>
+                    <svg className='w-8 h-8 text-white animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                       <path
                         strokeLinecap='round'
                         strokeLinejoin='round'
@@ -504,122 +697,72 @@ export default function CompletePage() {
                         d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
                       />
                     </svg>
-                  ) : (
-                    <DownloadIcon />
-                  )}
-                  {isDownloading ? 'ダウンロード中...' : 'コンプリート画像を保存'}
-                </button>
+                  </div>
+                ) : (
+                  <div className='absolute inset-0 flex items-center justify-center'>
+                    <svg className='w-8 h-8 text-white opacity-25' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                      />
+                    </svg>
+                  </div>
+                )}
               </div>
+            );
+          })}
+        </div>
+      </div>
+        <div className='flex justify-center mb-8'>
+          <Link
+            href='/'
+            className='px-8 py-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:shadow-xl active:scale-95'>
+            ホームに戻る
+          </Link>
+        </div>
 
-              <div className='flex-1 w-full p-4 my-6 bg-gray-100 shadow-lg rounded-lg gap-2'>
-                <p className='w-full text-sm font-bold text-gray-600'>コンプリートカード受け取り方法</p>
-                <p className='w-full text-xs mt-4 text-gray-600'>
-                  尾張瀬戸駅出札窓口で、記念乗車券に 付属しているコンプリートカード引換券と、 この画面を一緒に提示してください。
-                </p>
-              </div>
-
-              <div className='flex-1 w-full p-4 my-6 bg-gray-100 shadow-lg rounded-lg gap-2'>
-                <p className='w-full text-sm text-gray-600'>↓係員用 交換確認ボタン</p>
-                <p className='w-full text-xs mt-4 text-gray-600'>お客さま自身で操作しないでください。</p>
-                <button
-                  onClick={handleExchange}
-                  disabled={isExchanged || isLoading}
-                  className={`mt-4 px-8 py-3 rounded-full shadow-lg transition-all hover:shadow-xl active:scale-95 flex items-center gap-2 ${
-                    isExchanged ? 'bg-gray-400 cursor-not-allowed' : isLoading ? 'bg-yellow-500 cursor-wait' : 'bg-red-500 hover:bg-red-600'
-                  } text-white`}>
-                  {isLoading ? <span>処理中...</span> : isExchanged ? <span>景品交換済み</span> : <span>景品と交換する</span>}
-                </button>
-              </div>
-
-              <div className='flex-1 w-full my-6 gap-2'>
-                <p className='text-gray-600'>
-                  🎵 瀬戸蔵ミュージアムのご紹介動画です
-                  <br />
-                  ぜひご視聴ください
-                </p>
-                <div className='w-full max-w-2xl my-4 aspect-video'>
-                  <iframe
-                    className='w-full h-full'
-                    src='https://www.youtube.com/embed/sG2qLjitPxw?autoplay=1&mute=1'
-                    title='YouTube video'
-                    frameBorder='0'
-                    allow='autoplay; encrypted-media'
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-
-              <div className='mt-8 mb-6 shadow-lg rounded-lg p-4 w-full'>
-                <h3 className='text-black text-md font-bold text-center mb-4'>✨ スタンプコレクション ✨</h3>
-                <div className='grid grid-cols-5 gap-4 md:grid-cols-5 lg:grid-cols-10'>
-                  {collectedStamps.map((id) => {
-                    const stamp = STAMPS.find((s) => s.id === id);
-                    if (!stamp) return null;
-
-                    // 各スタンプ専用の処理中フラグを保持する状態変数
-                    const isThisStampSharing = isSharingStamp && processingStampId === stamp.id;
-
-                    return (
-                      <div
-                        key={id}
-                        className={`flex aspect-square rounded-md overflow-hidden relative ${isThisStampSharing ? 'opacity-90 cursor-wait' : 'cursor-pointer active:scale-95'} transition-all duration-200`}
-                        onClick={() => !isSharingStamp && handleSaveStamp(stamp)}>
-                        <Image src={stamp.image} alt={stamp.name} width={100} height={100} className='object-cover w-full h-full' />
-                        {isThisStampSharing ? (
-                          <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-50'>
-                            <svg className='w-8 h-8 text-white animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                              <path
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                                strokeWidth={2}
-                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                              />
-                            </svg>
-                          </div>
-                        ) : (
-                          <div className='absolute inset-0 flex items-center justify-center'>
-                            <svg className='w-8 h-8 text-white opacity-25' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                              <path
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                                strokeWidth={2}
-                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                              />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <Link
-                href='/'
-                className='px-8 py-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:shadow-xl active:scale-95 md:px-10 md:py-4 md:text-lg'>
-                ホームに戻る
-              </Link>
-            </main>
-          </>
-        )}
-
-        {/* 確認アラート */}
-        {showConfirmation && (
-          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-            <div className='bg-white p-6 rounded-xl shadow-xl max-w-sm w-full'>
-              <h3 className='text-black text-lg font-bold mb-4'>景品交換の確認</h3>
-              <p className='mb-6 text-gray-600'>本当にコンプリートカードと景品を交換しますか？</p>
-              <div className='flex justify-end gap-3'>
-                <button onClick={() => setShowConfirmation(false)} className='px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400'>
-                  キャンセル
-                </button>
-                <button onClick={confirmExchange} className='px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600'>
-                  交換する
-                </button>
-              </div>
+      {/* 確認アラート */}
+      {showConfirmation && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+          <div className='bg-white p-6 rounded-xl shadow-xl max-w-sm w-full'>
+            <h3 className='text-black text-lg font-bold mb-4'>クーポン使用の確認</h3>
+            <p className='mb-6 text-gray-600'>このクーポンを使用しますか？</p>
+            <div className='flex justify-end gap-3'>
+              <button onClick={() => setShowConfirmation(false)} className='px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400'>
+                キャンセル
+              </button>
+              <button onClick={confirmExchange} className='px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600'>
+                使用する
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+      
+      {/* ルーレットモーダル */}
+      {showRoulette && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className='fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className='bg-white p-8 rounded-2xl shadow-2xl max-w-lg w-full relative'>
+            <button
+              onClick={() => setShowRoulette(false)}
+              className='absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl'>
+              ✕
+            </button>
+            <h3 className='text-2xl font-bold text-center text-purple-600 mb-6'>🎰 エクストラボーナスルーレット 🎰</h3>
+            <RouletteWheel 
+              onSpinComplete={handleRouletteComplete} 
+            />
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

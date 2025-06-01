@@ -2,13 +2,13 @@ import { useState, useEffect } from "react"
 
 // 音響フィンガープリントSDK (EFPKit2) のCDN URL。このURLからSDKが読み込まれます。
 const efp2ModuleUrl =
-  "https://websdk-v2-cdn.evixar.com/sdk/efpkit2/2.1/efpkit2.js"
+  "https://websdk-cdn.airymedia.net/sdk/efpkit2/2.3/efpkit2.js"
 // 音響フィンガープリントデータのURL。このデータとマイク入力を照合して音声を認識します。
+// TODO: シヤチハタ動物園用の正しいフィンガープリントURLに更新が必要
 const fpUrl =
-  "https://websdk-v2-cdn.evixar.com/fingerprint/shachihata_setosen_2025/2/packed.db"
+  "https://triggerdb-cdn.airymedia.net/0196f81c-a612-7702-8a99-09010871a006/0196f81d-fb0d-7d7b-8613-86328d2138e0/6/packed.db"
 
-// 環境変数からAPIキーを読み込む
-const apiKey = process.env.NEXT_PUBLIC_EFP_API_KEY;
+// APIキーは引数として渡される
 
 // エラーの種類を定義する列挙型。これにより、エラーの種類を明確に識別できます。
 export enum EFPErrorType {
@@ -52,7 +52,7 @@ let recognier: Recognizer | null = null // EFPKit2 SDKの認識エンジンイ�
  *  - error: 発生したエラーの情報を保持するEFPErrorオブジェクト、またはエラーがない場合はnull。
  *  - setError: error状態を更新するための関数（主に内部エラー処理用）。
  */
-export const useEFP2 = () => {
+export const useEFP2 = (apiKey: string) => {
   // 認識された音響パターンのメタデータを保持するstate。初期値はnull。
   const [meta, setMeta] = useState<string | null>(null)
   // 現在録音中（認識処理がアクティブ）かどうかを示すstate。初期値はfalse。

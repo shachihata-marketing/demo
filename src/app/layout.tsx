@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import MobileContainer from '@/components/MobileContainer';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -13,21 +14,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: '名鉄音鉄サウンドスタンプラリー',
-  description: '名鉄音鉄サウンドスタンプラリーアプリ',
+  title: 'シヤチハタ動物園デモページ',
+  description: 'シヤチハタ動物園 音声スタンプラリー デモンストレーション',
+  metadataBase: new URL('https://shachihata-zoo-demo.vercel.app'),
   openGraph: {
-    title: '名鉄瀬戸線開業120周年記念 音鉄サウンドスタンプラリー',
-    description: '名鉄瀬戸線開業120周年を記念した音を集めるデジタルスタンプラリーです。',
+    title: 'シヤチハタ動物園デモページ',
+    description: '音響認識技術を使用したデジタルスタンプラリーのデモンストレーション',
+    images: ['/images/logo.png'],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'シヤチハタ動物園デモページ',
+    description: '音響認識技術を使用したデジタルスタンプラリーのデモンストレーション',
     images: ['/images/logo.png'],
   },
-  viewport: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no',
-  themeColor: '#004ea2',
 };
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#004ea2',
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#22c55e',
 };
 
 export default function RootLayout({
@@ -37,7 +46,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='ja'>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}>{children}</body>
+      <head>
+        <link rel='manifest' href='/manifest.json' />
+        <link rel='apple-touch-icon' href='/images/logo.png' />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <MobileContainer>{children}</MobileContainer>
+      </body>
     </html>
   );
 }

@@ -1,0 +1,22 @@
+{
+  "name": "シヤチハタ動物園デモページ",
+  "short_name": "シヤチハタ動物園",
+  "description": "音響認識技術を使用したデジタルスタンプラリーのデモンストレーション",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#22c55e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/images/hero1.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/hero1.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
