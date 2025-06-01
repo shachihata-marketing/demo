@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
-import { useEFP2 } from '../../useEFP2';
+import { useEFP2 } from '@/hooks/useEFP2';
 import Image from 'next/image';
 import { STAMPS } from '@/lib/stamps';
 
@@ -231,8 +231,6 @@ const setupGlobalErrorHandlers = () => {
 export default function Home() {
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const APIKEY =
-    'C8w5IdiLDykjCe2Y3kESlzpvFtPxSOyX7wlqJTllFdKHy02IGNmVwMerhQJD6S8ek0zueOdaLEpnL5u25WqYZb5516tGVZcGUrJcgRL6s1veg8d8t7izQqToN/wlbNi1oQNInwTy8KXFgnKxbfsd+cYYQks9JGttFQeY2WiEtZvS/+N4HNVn2u/GZGHOUAv+0oukh1L7gMLxwy6mFGPWbzu6AGUUJjr8rTkWzDuPmuHLEnU1DW+lfI5yQeVfuIab';
 
   // const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -267,7 +265,7 @@ export default function Home() {
     }
   });
 
-  const { meta, isRec, handleSwitchRec } = useEFP2(APIKEY);
+  const { meta, isRec, handleSwitchRec } = useEFP2();
 
   // グローバルエラーハンドラーの設定
   useEffect(() => {
