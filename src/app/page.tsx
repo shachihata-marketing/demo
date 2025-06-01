@@ -1085,7 +1085,7 @@ export default function Home() {
             <p className='text-sm'>
               ① 動物の近くや園内各所で
               <span className='font-bold text-lg text-[#004ea2]'>「スタートボタン」</span>
-              を押してください
+              を押してください。
             </p>
             <p className='text-sm'>② マイクの使用を許可してください</p>
             <p className='text-sm'>
