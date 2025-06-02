@@ -152,7 +152,7 @@ export default function CompletePage() {
     };
 
     loadUserAndStamps();
-  }, [supabase]);
+  }, []);
 
   /**
    * 「クーポンを使用する」ボタンがクリックされたときの処理。
