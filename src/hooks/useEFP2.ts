@@ -259,7 +259,7 @@ export const useEFP2 = (apiKey: string) => {
             stream.getTracks().forEach((track) => {
               track.stop(); // 個々のメディアトラック（この場合はオーディオトラック）を停止
             });
-          } catch (trackError) {
+          } catch (_trackError) {
             // トラック停止中に警告が発生した場合、コンソールに出力します。
             // これは致命的なエラーではない可能性が高いため、警告として扱います。
             // Android: トラック停止中に警告
@@ -412,7 +412,7 @@ export const useEFP2 = (apiKey: string) => {
         // AudioContextのクローズ処理もエラーを発生させる可能性があるため、try-catchで囲みます。
         try {
             audioContext.close();
-        } catch (closeError) {
+        } catch (_closeError) {
             // クローズ時のエラーは主要なエラーではないため、警告としてログに出力するに留めます。
             // AudioContext close error during cleanup
         }

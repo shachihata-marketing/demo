@@ -351,7 +351,7 @@ export default function Home() {
           },
           { onConflict: 'user_id' }
         );
-      } catch (error) {
+      } catch (_error) {
         // エラーは記録するだけで、ゲームには影響させない
       }
     },
@@ -477,7 +477,7 @@ export default function Home() {
             }
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Supabaseエラーは無視して、ローカルで継続
         // Supabase fetch failed, using local data
       }
@@ -519,7 +519,7 @@ export default function Home() {
         setMicPermissionDenied(false);
         return true;
       }
-    } catch (error) {
+    } catch (_error) {
       // パーミッション確認エラー
       // 確認できない場合は許可ダイアログを表示するために true を返す
       return true;
@@ -550,7 +550,7 @@ export default function Home() {
           // マイク許可が成功しました
           setMicPermissionDenied(false);
           micPermissionGranted = true;
-        } catch (micError) {
+        } catch (_micError) {
           // マイク許可エラー
           setMicPermissionDenied(true);
           setShowPermissionGuide(true);
@@ -621,7 +621,7 @@ export default function Home() {
                 is_redeemed: false
               }, { onConflict: 'user_id' });
               // user_stamps初期レコード作成成功
-            } catch (error) {
+            } catch (_error) {
               // user_stamps初期レコード作成エラー
               // エラーがあっても継続
             }
@@ -722,7 +722,7 @@ export default function Home() {
       setTimeout(() => {
         // 音響検知ボタンクリック後の状態を確認
       }, 500);
-    } catch (error) {
+    } catch (_error) {
       // 音声認識エラー
       // エラータイプに応じたメッセージを表示
       if (efpError) {
@@ -738,7 +738,7 @@ export default function Home() {
         alert('音声認識の開始に失敗しました。\n\nページを再読み込みしてから、もう一度お試しください。');
       }
     }
-  }, [isRec, handleSwitchRec, efpError]);
+  }, [handleSwitchRec, efpError]);
 
   // スタンプ保存ハンドラー
   const [isSharingStamp, setIsSharingStamp] = useState(false);
@@ -849,7 +849,7 @@ export default function Home() {
         try {
           localStorage.removeItem(key);
           sessionStorage.removeItem(key);
-        } catch (e) {
+        } catch (_e) {
           // キー削除中にエラーが発生
         }
       });
@@ -869,7 +869,7 @@ export default function Home() {
               onConflict: 'user_id',
             }
           );
-        } catch (dbError) {
+        } catch (_dbError) {
           // データベースリセット中にエラー
         }
       }
@@ -877,7 +877,7 @@ export default function Home() {
       // Supabaseからサインアウト
       try {
         await supabase.auth.signOut();
-      } catch (signOutError) {
+      } catch (_signOutError) {
         // サインアウト中にエラー
       }
 
@@ -890,7 +890,7 @@ export default function Home() {
         sessionStorage.removeItem('justReset');
         window.location.reload();
       }, 500);
-    } catch (error) {
+    } catch (_error) {
       // 再チャレンジエラー
       alert('リセット中にエラーが発生しました。ページをリロードします。');
       // エラーが発生しても強制的にリロード
@@ -1401,11 +1401,11 @@ export default function Home() {
 
                       // コンプリートページへ自動遷移
                       router.push('/complete');
-                    } catch (e) {
+                    } catch (_e) {
                       // ページ遷移エラー
                     }
                   }, 1500);
-                } catch (error) {
+                } catch (_error) {
                   // コンプリートページ遷移エラー
                 }
               }}
@@ -1473,7 +1473,7 @@ const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete
       fetch('/lottie/hanabi.json')
         .then((res) => res.json())
         .then((data) => setFireworksData(data))
-        .catch((err) => {
+        .catch((_err) => {
           // Lottie JSON 読み込みエラー
         });
     }
