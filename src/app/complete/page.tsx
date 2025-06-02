@@ -6,7 +6,7 @@
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import { STAMPS } from '@/lib/stamps';
 import DownloadIcon from '@/components/DownloadIcon';
@@ -27,8 +27,7 @@ const RouletteWheel = dynamic(() => import('@/components/RouletteWheel'), {
  * - トップページへの導線
  */
 export default function CompletePage() {
-  // Supabaseクライアントインスタンスを作成
-  const supabase = createClientComponentClient();
+  // Supabaseクライアントインスタンスはインポート済み
   // 収集済みのスタンプIDの配列を保持するstate
   const [collectedStamps, setCollectedStamps] = useState<number[]>([]);
   // スタンプ画像の共有処理が実行中かどうかを示すstate
