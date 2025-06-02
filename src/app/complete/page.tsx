@@ -272,8 +272,7 @@ export default function CompletePage() {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
 
-      // console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
-      // console.log('完了画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+      // デバイスタイプと共有API対応状況の確認
 
       if (canUseShareAPI) {
         try {
@@ -282,7 +281,7 @@ export default function CompletePage() {
             title: 'シヤチハタ動物園 スタンプラリーコンプリート',
             text: 'シヤチハタ動物園スタンプラリーをコンプリートしました！🎉',
           });
-          // console.log('コンプリート画像共有成功');
+          // コンプリート画像共有成功
         } catch (shareError) {
           // キャンセルの場合は静かに終了
           if (
@@ -375,8 +374,7 @@ export default function CompletePage() {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const canUseShareAPI = isMobile && typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] });
 
-      // console.log('デバイスタイプ:', isMobile ? 'モバイル' : 'デスクトップ');
-      // console.log('スタンプ画像: 共有API対応状況:', canUseShareAPI ? '対応' : '非対応');
+      // デバイスタイプと共有API対応状況の確認
 
       if (canUseShareAPI) {
         try {
@@ -385,7 +383,7 @@ export default function CompletePage() {
             title: `${stamp.name}のスタンプ`,
             text: `シヤチハタ動物園「${stamp.name}」のスタンプを獲得しました！`,
           });
-          // console.log('スタンプ共有成功');
+          // スタンプ共有成功
         } catch (shareError) {
           // キャンセルの場合は静かに終了
           if (

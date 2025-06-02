@@ -20,15 +20,7 @@ const STORAGE_KEY = 'collectedStamps';
 // テストモード設定 - 環境変数で制御
 const TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
 
-// 開発環境の設定確認
-if (typeof window !== 'undefined') {
-  console.log('=== 環境設定 ===');
-  console.log(`モード: ${TEST_MODE ? 'テストモード' : '本番モード'}`);
-  console.log(`Supabase URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ 設定済み' : '❌ 未設定'}`);
-  console.log(`Supabase Key: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ 設定済み' : '❌ 未設定'}`);
-  console.log(`EFP2 API Key: ${process.env.NEXT_PUBLIC_EFP2_API_KEY ? '✅ 設定済み' : '❌ 未設定'}`);
-  console.log('================');
-}
+// 開発環境の設定確認 - 本番環境では無効化
 
 // エラータイプ定義
 type ErrorType = 'NetworkError' | 'DatabaseError' | 'LocalStorageError' | 'PermissionError' | 'UnknownError';
@@ -221,23 +213,29 @@ export default function Home() {
   });
 
   // 本番環境と同じように環境変数を使用
-  const APIKEY = process.env.NEXT_PUBLIC_EFP2_API_KEY || '';
+  // 一時的にハードコード（本番環境での緊急対応）
+  const APIKEY = 'eMaYe9yDYUY2wQWsCnlUehaiTjAmpP9KRm9nx4apBnL3E6VhL51E8qCOD+K6sva3EtboAQQ9a0Zq2YFbmOOyDa1vEhBxAPSGkuGYErAjFiTdGx20X9go8f+Q0YvCkD+Xq1gqu4Ks1/qaGD7M/J6UKzHo9NqEGj+ah55c9vL206Rs4hXcgTn9L2K9SunHh1wDAsdA704RbTnzRNQ2bqSIKblf63VFZEBkwdb/DEU+l04XXwXyGEjV1n69Dy31ZIoB';
 
   // APIキーの検証
-  if (!APIKEY) {
-    console.error('EFP2 APIキーが設定されていません。.env.localファイルを確認してください。');
-  }
+  useEffect(() => {
+    // APIキー確認 (本番環境デバッグ) - コンソールログを削除
+    
+    if (!APIKEY) {
+      // EFP2 APIキーが設定されていません
+      alert('APIキーが設定されていません。管理者に連絡してください。');
+    }
+  }, []);
 
   const { meta, isRec, handleSwitchRec, error: efpError } = useEFP2(APIKEY);
 
   // EFPエラーの監視
   useEffect(() => {
     if (efpError) {
-      console.error('EFPエラーを検出:', efpError);
+      // EFPエラーを検出
       // マイク切断エラーの場合は自動的に録音を停止
       if (efpError.type === EFPErrorType.StreamStopFailed || efpError.message.includes('マイクが切断されました')) {
         if (isRec) {
-          console.log('マイク切断を検出したため録音を停止します');
+          // マイク切断を検出したため録音を停止
           // isRecの状態は既にfalseになっているはずなので、UIの更新のみ
         }
       }
@@ -355,7 +353,6 @@ export default function Home() {
         );
       } catch (error) {
         // エラーは記録するだけで、ゲームには影響させない
-        console.log('Supabase sync failed, but game continues:', error);
       }
     },
     [supabase]
@@ -482,7 +479,7 @@ export default function Home() {
         }
       } catch (error) {
         // Supabaseエラーは無視して、ローカルで継続
-        console.log('Supabase fetch failed, using local data:', error);
+        // Supabase fetch failed, using local data
       }
     };
 
@@ -523,7 +520,7 @@ export default function Home() {
         return true;
       }
     } catch (error) {
-      console.error('パーミッション確認エラー:', error);
+      // パーミッション確認エラー
       // 確認できない場合は許可ダイアログを表示するために true を返す
       return true;
     }
@@ -550,11 +547,11 @@ export default function Home() {
         try {
           // マイクへのアクセスを要求
           await navigator.mediaDevices.getUserMedia({ audio: true });
-          console.log('マイク許可が成功しました');
+          // マイク許可が成功しました
           setMicPermissionDenied(false);
           micPermissionGranted = true;
         } catch (micError) {
-          console.error('マイク許可エラー:', micError);
+          // マイク許可エラー
           setMicPermissionDenied(true);
           setShowPermissionGuide(true);
           setIsLoading(false);
@@ -569,13 +566,7 @@ export default function Home() {
           const { data, error } = await supabase.auth.signInAnonymously();
 
           if (error) {
-            console.error('認証エラー:', error);
-            console.error('エラーの詳細:', {
-              message: error.message,
-              status: error.status,
-              name: error.name,
-              cause: error.cause,
-            });
+            // 認証エラーの処理
 
             // エラーの詳細をログに記録
             errorMonitor.log(error.message || 'Unknown auth error', 'Anonymous sign-in failed', 'NetworkError');
@@ -586,10 +577,10 @@ export default function Home() {
             if (error.message?.includes('Invalid API key')) {
               errorMessage =
                 'Supabase APIキーが無効です。\n\nSupabaseダッシュボードから最新のanon keyを取得して、.env.localファイルのNEXT_PUBLIC_SUPABASE_ANON_KEYを更新してください。';
-              console.error('Supabase Anon Key が無効です。Supabaseダッシュボード > Settings > API から最新のanon keyを取得してください。');
+              // Supabase Anon Key が無効です
 
               // ローカルモードで続行
-              console.warn('Supabase認証に失敗したため、ローカルモードで動作します');
+              // Supabase認証に失敗したため、ローカルモードで動作
               const dummyUserId = `local-user-${Date.now()}`;
               setUser({ id: dummyUserId } as User);
 
@@ -618,7 +609,7 @@ export default function Home() {
           }
 
           // 認証成功
-          console.log('認証成功:', data);
+          // 認証成功
           
           // user_stampsテーブルに初期レコードを作成
           if (data.user) {
@@ -629,9 +620,9 @@ export default function Home() {
                 is_completed: false,
                 is_redeemed: false
               }, { onConflict: 'user_id' });
-              console.log('user_stamps初期レコード作成成功');
+              // user_stamps初期レコード作成成功
             } catch (error) {
-              console.error('user_stamps初期レコード作成エラー:', error);
+              // user_stamps初期レコード作成エラー
               // エラーがあっても継続
             }
           }
@@ -642,10 +633,8 @@ export default function Home() {
 
           // 音声認識を開始
           await handleSwitchRec();
-        } catch (err) {
-          console.error('予期しないエラー:', err);
-          // 認証エラーでもローカルモードで続行
-          console.warn('Supabase認証に失敗したため、ローカルモードで動作します');
+        } catch {
+          // 予期しないエラー - ローカルモードで継行
           const dummyUserId = `local-user-${Date.now()}`;
           setUser({ id: dummyUserId } as User);
 
@@ -657,8 +646,7 @@ export default function Home() {
           await handleSwitchRec();
         }
       }
-    } catch (error) {
-      console.error('匿名認証エラー:', error);
+    } catch {
       alert('エラーが発生しました。再度試してください。');
     } finally {
       setIsLoading(false);
@@ -669,19 +657,15 @@ export default function Home() {
     if (!meta || isProcessingStamp) return;
 
     // EFP検出時のメタデータをログ出力
-    console.log('EFP検出 - メタデータ:', meta);
-    console.log(
-      '利用可能なスタンプ:',
-      STAMPS.map((s) => ({ id: s.id, name: s.name, meta: s.meta }))
-    );
+    // EFP検出 - メタデータを処理
 
     try {
       const matchedStamp = STAMPS.find((stamp) => stamp.meta === meta);
-      console.log('マッチング結果:', matchedStamp ? `${matchedStamp.name} (ID: ${matchedStamp.id})` : 'マッチなし');
+      // マッチング結果を確認
 
       if (matchedStamp && !collectedStamps.includes(matchedStamp.id)) {
         setIsProcessingStamp(true); // 処理中フラグをセット
-        console.log('新しいスタンプを追加:', matchedStamp.name);
+        // 新しいスタンプを追加
         // 安全にスタンプを追加
         const updatedStamps = [...collectedStamps, matchedStamp.id];
         setCollectedStamps(updatedStamps);
@@ -702,7 +686,7 @@ export default function Home() {
               try {
                 // 遷移前にレコーディングを停止
                 if (isRec) {
-                  console.log('コンプリートページへの遷移前にレコーディングを停止します');
+                  // コンプリートページへの遷移前にレコーディングを停止
                   await handleSwitchRec();
                 }
 
@@ -731,15 +715,15 @@ export default function Home() {
 
   // 音響検知ボタンのハンドラー
   const handleAudioDetection = useCallback(async () => {
-    console.log('音響検知ボタンがクリックされました。現在のisRec:', isRec);
+    // 音響検知ボタンがクリックされました
     try {
       await handleSwitchRec();
       // 確実に変更が反映されるよう、少し遅延させてコンソールに状態を出力
       setTimeout(() => {
-        console.log('音響検知ボタンクリック後 isRec:', isRec);
+        // 音響検知ボタンクリック後の状態を確認
       }, 500);
     } catch (error) {
-      console.error('音声認識エラー:', error);
+      // 音声認識エラー
       // エラータイプに応じたメッセージを表示
       if (efpError) {
         if (efpError.type === EFPErrorType.PermissionDenied) {
@@ -763,7 +747,7 @@ export default function Home() {
     async (stamp: (typeof STAMPS)[number]) => {
       // 既に共有操作が進行中なら早期リターン
       if (isSharingStamp) {
-        console.log('他のスタンプの共有処理が進行中です。しばらくお待ちください。');
+        // 他のスタンプの共有処理が進行中
         return;
       }
 
@@ -833,7 +817,7 @@ export default function Home() {
     try {
       setIsLoading(true);
 
-      console.log('全てのデータをリセットします...');
+      // 全てのデータをリセット
 
       // リセットフラグを設定
       localStorage.setItem('justReset', 'true');
@@ -866,7 +850,7 @@ export default function Home() {
           localStorage.removeItem(key);
           sessionStorage.removeItem(key);
         } catch (e) {
-          console.error(`キー '${key}' の削除中にエラーが発生しました:`, e);
+          // キー削除中にエラーが発生
         }
       });
 
@@ -886,7 +870,7 @@ export default function Home() {
             }
           );
         } catch (dbError) {
-          console.error('データベースリセット中にエラーが発生しました:', dbError);
+          // データベースリセット中にエラー
         }
       }
 
@@ -894,10 +878,10 @@ export default function Home() {
       try {
         await supabase.auth.signOut();
       } catch (signOutError) {
-        console.error('サインアウト中にエラーが発生しました:', signOutError);
+        // サインアウト中にエラー
       }
 
-      console.log('リセット完了。ページをリロードします...');
+      // リセット完了。ページをリロード
       alert('リセットが完了しました。最初からやり直します。');
 
       // リロード前にリセットフラグをクリア
@@ -907,7 +891,7 @@ export default function Home() {
         window.location.reload();
       }, 500);
     } catch (error) {
-      console.error('再チャレンジエラー:', error);
+      // 再チャレンジエラー
       alert('リセット中にエラーが発生しました。ページをリロードします。');
       // エラーが発生しても強制的にリロード
       window.location.reload();
@@ -922,7 +906,7 @@ export default function Home() {
     if (!isConfirmed) return;
 
     try {
-      console.log('全てのデータをリセットします...');
+      // 全てのデータをリセット
 
       // リセットフラグを設定
       localStorage.setItem('justReset', 'true');
@@ -974,7 +958,7 @@ export default function Home() {
       // Supabaseからサインアウト
       await supabase.auth.signOut();
 
-      console.log('リセット完了。ページをリロードします...');
+      // リセット完了。ページをリロード
       alert('リセットが完了しました。ページをリロードします。');
 
       // リロード前にリセットフラグをクリア
@@ -984,7 +968,7 @@ export default function Home() {
         window.location.reload();
       }, 500);
     } catch (error) {
-      console.error('リセット中にエラーが発生しました:', error);
+      // リセット中にエラー
       alert(`リセット中にエラーが発生しました: ${error}`);
 
       // エラーが発生した場合でもリセットフラグをクリア
@@ -1227,7 +1211,7 @@ export default function Home() {
                   onClick={async () => {
                     // 遷移前にレコーディングを停止
                     if (isRec) {
-                      console.log('コンプリートページへの遷移前にレコーディングを停止します');
+                      // コンプリートページへの遷移前にレコーディングを停止
                       await handleSwitchRec();
                     }
                     router.push('/complete');
@@ -1392,8 +1376,11 @@ export default function Home() {
                     .from('user_stamps')
                     .upsert({ user_id: user.id, stamps: allStamps }, { onConflict: 'user_id' })
                     .then(({ error }) => {
-                      if (error) console.error('スタンプ保存エラー:', error);
-                      else console.log('テスト用：4個のスタンプを設定しました');
+                      if (error) {
+                        // スタンプ保存エラー
+                      } else {
+                        // テスト用：4個のスタンプを設定しました
+                      }
                     });
                 }
 
@@ -1408,18 +1395,18 @@ export default function Home() {
                     try {
                       // 遷移前にレコーディングを停止
                       if (isRec) {
-                        console.log('コンプリートページへの遷移前にレコーディングを停止します');
+                        // コンプリートページへの遷移前にレコーディングを停止
                         await handleSwitchRec();
                       }
 
-                      console.log('コンプリートページへ自動遷移します');
+                      // コンプリートページへ自動遷移
                       router.push('/complete');
                     } catch (e) {
-                      console.error('ページ遷移エラー:', e);
+                      // ページ遷移エラー
                     }
                   }, 1500);
                 } catch (error) {
-                  console.error('コンプリートページ遷移エラー:', error);
+                  // コンプリートページ遷移エラー
                 }
               }}
               className='px-4 py-2 md:px-6 md:py-3 bg-green-500 hover:bg-green-600 text-white rounded-md shadow-md'>
@@ -1437,8 +1424,11 @@ export default function Home() {
                     .from('user_stamps')
                     .upsert({ user_id: user.id, stamps: [] }, { onConflict: 'user_id' })
                     .then(({ error }) => {
-                      if (error) console.error('スタンプリセットエラー:', error);
-                      else console.log('テスト用：スタンプをリセットしました');
+                      if (error) {
+                        // スタンプリセットエラー
+                      } else {
+                        // テスト用：スタンプをリセットしました
+                      }
                     });
                 }
               }}
@@ -1483,7 +1473,9 @@ const StampCollectionAnimation: React.FC<{ stamp: (typeof STAMPS)[0]; onComplete
       fetch('/lottie/hanabi.json')
         .then((res) => res.json())
         .then((data) => setFireworksData(data))
-        .catch((err) => console.error('Lottie JSON 読み込みエラー:', err));
+        .catch((err) => {
+          // Lottie JSON 読み込みエラー
+        });
     }
   }, [showStamp]);
   // スタンプ表示後に1秒拡大＋バウンス → 2秒停止後に完了コール

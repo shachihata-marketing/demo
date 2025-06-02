@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--browser", "chrome"]
+    },
+    "pexels-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@CaullenOmdahl/pexels-mcp-server",
+        "--key",
+        "69827da2-6034-4400-9787-04e6633da05b",
+        "--profile",
+        "alive-coral-5eeSTn"
+      ]
+    }
+  }
+}

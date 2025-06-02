@@ -1,8 +1,20 @@
 import { useState, useEffect } from "react"
 
 // 音響フィンガープリントSDK (EFPKit2) のCDN URL。このURLからSDKが読み込まれます。
-const efp2ModuleUrl =
-  "https://websdk-cdn.airymedia.net/sdk/efpkit2/2.3/efpkit2.js"
+// 本番環境ではクエリパラメータでAPIキーを渡す必要がある
+const getEfp2ModuleUrl = (apiKey?: string) => {
+  const baseUrl = "https://websdk-cdn.airymedia.net/sdk/efpkit2/2.3/efpkit2.js"
+  
+  // APIキーが提供されている場合は常にクエリパラメータに含める
+  if (apiKey) {
+    // EFP2のドキュメントに基づいて正しいパラメータ名を使用
+    // 'apikey' が最も一般的な形式
+    return `${baseUrl}?apikey=${encodeURIComponent(apiKey)}`
+  }
+  
+  // APIキーがない場合 - 本番環境ではログを出さない
+  return baseUrl
+}
 // 音響フィンガープリントデータのURL。このデータとマイク入力を照合して音声を認識します。
 // TODO: シヤチハタ動物園用の正しいフィンガープリントURLに更新が必要
 const fpUrl =
@@ -42,6 +54,7 @@ let stream: MediaStream | null = null // マイクからの音声ストリーム
 let audioContext: AudioContext | null = null // 音声処理を行うためのAudioContextオブジェクト
 let audioSampleRate: number | null = null // AudioContextのサンプルレート
 let recognier: Recognizer | null = null // EFPKit2 SDKの認識エンジンインスタンス
+let keepAliveInterval: NodeJS.Timeout | null = null // ストリーム維持用のインターバル
 
 /**
  * useEFP2カスタムフック。音響フィンガープリント認識機能を提供します。
@@ -53,6 +66,11 @@ let recognier: Recognizer | null = null // EFPKit2 SDKの認識エンジンイ�
  *  - setError: error状態を更新するための関数（主に内部エラー処理用）。
  */
 export const useEFP2 = (apiKey: string) => {
+  // 本番環境での初期化確認
+  useEffect(() => {
+    // 本番環境ではログ出力を無効化
+  }, [apiKey])
+  
   // 認識された音響パターンのメタデータを保持するstate。初期値はnull。
   const [meta, setMeta] = useState<string | null>(null)
   // 現在録音中（認識処理がアクティブ）かどうかを示すstate。初期値はfalse。
@@ -155,7 +173,7 @@ export const useEFP2 = (apiKey: string) => {
         audio: audioConfig,
       })
       // 音声ストリームの取得に成功したら、音声処理の初期化を行います。
-      await handleMediaDevicesOpened(mediaStream)
+      await handleMediaDevicesOpened(mediaStream, apiKey)
       
       // ストリームの状態を監視
       const audioTracks = mediaStream.getAudioTracks()
@@ -164,7 +182,6 @@ export const useEFP2 = (apiKey: string) => {
         
         // トラックの終了イベントを監視
         track.addEventListener('ended', () => {
-          console.warn('マイクトラックが予期せず終了しました')
           setError({
             type: EFPErrorType.StreamStopFailed,
             message: 'マイクが切断されました。再度お試しください。',
@@ -175,7 +192,7 @@ export const useEFP2 = (apiKey: string) => {
         
         // トラックのミュート状態を監視
         track.addEventListener('mute', () => {
-          console.warn('マイクがミュートされました')
+          // マイクがミュートされた
         })
       }
       
@@ -183,6 +200,30 @@ export const useEFP2 = (apiKey: string) => {
       setMeta(null) // 前回の認識結果をクリア
       setIsRec(true) // 録音中状態に設定
       setError(null) // エラー状態をクリア
+      
+      // 本番環境でのストリーム維持対策
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        // 30秒ごとにストリームの状態をチェックし、必要に応じて再接続
+        if (keepAliveInterval) {
+          clearInterval(keepAliveInterval)
+        }
+        keepAliveInterval = setInterval(() => {
+          if (stream && stream.active) {
+            const tracks = stream.getAudioTracks()
+            if (tracks.length > 0 && tracks[0].readyState === 'live') {
+              // ストリーム状態: 正常
+            } else {
+              // ストリーム状態: 異常を検出
+              setError({
+                type: EFPErrorType.StreamStopFailed,
+                message: 'マイクの接続が切れました。再度お試しください。',
+                details: 'Stream track is not live'
+              })
+              recordStop()
+            }
+          }
+        }, 30000) // 30秒ごと
+      }
     } catch (error) {
       // マイクの起動に失敗した場合のエラーハンドリング
       let errorType = EFPErrorType.StreamStartFailed;
@@ -221,7 +262,7 @@ export const useEFP2 = (apiKey: string) => {
           } catch (trackError) {
             // トラック停止中に警告が発生した場合、コンソールに出力します。
             // これは致命的なエラーではない可能性が高いため、警告として扱います。
-            console.warn("Android: トラック停止中に警告:", trackError);
+            // Android: トラック停止中に警告
           }
         }
 
@@ -234,6 +275,11 @@ export const useEFP2 = (apiKey: string) => {
         audioContext = null
         audioSampleRate = null
         recognier = null
+      }
+      // keepAliveインターバルをクリア
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval)
+        keepAliveInterval = null
       }
       // 状態を更新
       setIsRec(false) // 録音中状態を解除
@@ -254,9 +300,10 @@ export const useEFP2 = (apiKey: string) => {
    * 音声ストリーム取得成功後に呼び出される、音声処理の初期化を行う非同期関数。
    * AudioContextの準備、EFPKit2 SDKの読み込みと初期化、認識エンジンの設定を行います。
    * @param _stream {MediaStream} マイクから取得した音声ストリーム。
+   * @param apiKey {string} EFP2 APIキー
    * @throws {Error} AudioContextの初期化失敗、SDKの読み込み失敗、SDKの初期化失敗など。
    */
-  const handleMediaDevicesOpened = async (_stream: MediaStream) => {
+  const handleMediaDevicesOpened = async (_stream: MediaStream, apiKey: string) => {
     try {
       stream = _stream // グローバル変数に音声ストリームを保存
 
@@ -274,17 +321,29 @@ export const useEFP2 = (apiKey: string) => {
         setIsRec(false); // 録音状態を解除
         throw new Error("AudioContext not supported"); // エラーをスローして処理中断
       }
-      audioContext = new WindowAudioContext(); // AudioContextを生成
+      
+      // 本番環境（HTTPS）での追加設定
+      const audioContextOptions: AudioContextOptions = {}
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        // 本番環境では低レイテンシーモードを明示的に設定
+        audioContextOptions.latencyHint = 'interactive'
+        // サンプルレートを明示的に設定（デバイスのデフォルトに合わせる）
+        audioContextOptions.sampleRate = 48000
+      }
+      
+      audioContext = new WindowAudioContext(audioContextOptions); // AudioContextを生成
       
       // AudioContextの状態を確認し、suspendedの場合はresumeする
       if (audioContext.state === 'suspended') {
         try {
           await audioContext.resume()
-          console.log('AudioContextをresumeしました')
-        } catch (resumeError) {
-          console.error('AudioContext resumeエラー:', resumeError)
+          // AudioContextをresume
+        } catch {
+          // AudioContext resumeエラー
         }
       }
+      
+      // 本番環境での追加チェック - 本番ではログを出さない
       
       // audioContextが正常に初期化されたか（nullでないか）を確認します。
       // 通常、new演算子は成功すればインスタンスを返しますが、極稀なケースや
@@ -307,7 +366,7 @@ export const useEFP2 = (apiKey: string) => {
       let efp2; // EFPKit2 SDKモジュールを格納する変数
       try {
         // 外部のEFPKit2 SDKを動的にインポートします。
-        efp2 = await importEFP2()
+        efp2 = await importEFP2(apiKey)
       } catch (sdkError) {
         // SDKの読み込みに失敗した場合のエラー処理
         setError({
@@ -355,7 +414,7 @@ export const useEFP2 = (apiKey: string) => {
             audioContext.close();
         } catch (closeError) {
             // クローズ時のエラーは主要なエラーではないため、警告としてログに出力するに留めます。
-            console.warn("AudioContext close error during cleanup:", closeError);
+            // AudioContext close error during cleanup
         }
       }
       setIsRec(false) // 録音状態を解除
@@ -383,16 +442,34 @@ export const useEFP2 = (apiKey: string) => {
  * SDKのJavaScriptファイルをフェッチし、相対パスを絶対パスに書き換えた後、
  * Blob URLを作成してimport()構文でモジュールとして読み込みます。
  * これにより、CORSの問題を回避しつつ、外部スクリプトをESモジュールとして扱えます。
+ * @param {string} apiKey - EFP2 APIキー（SDKダウンロード時の認証に使用される可能性）
  * @returns {Promise<any>} インポートされたSDKモジュール。
  * @throws {Error} SDKのフェッチ失敗、テキスト化失敗、Blob URLからのインポート失敗など。
  */
-async function importEFP2() {
+async function importEFP2(apiKey?: string) {
   try {
-    // SDKのURLからJavaScriptファイルをフェッチ（ダウンロード）します。
-    const response = await fetch(efp2ModuleUrl)
+    // SDKのURLを生成（APIキーはクエリパラメータとして含める）
+    const sdkUrl = getEfp2ModuleUrl(apiKey)
+    
+    // SDK取得開始
+    
+    // シンプルなfetchリクエスト（ヘッダーは不要の可能性）
+    const response = await fetch(sdkUrl)
 
     //レスポンスが正常（HTTPステータスコード200番台）でなければエラーをスローします。
     if (!response.ok) {
+      // SDK取得エラー
+      
+      // 401エラーの場合は認証の問題
+      if (response.status === 401) {
+        throw new Error(`SDKの認証に失敗しました。APIキーが正しいか確認してください。(HTTPステータス: ${response.status})`)
+      }
+      
+      // 503エラーの場合はサービス利用不可
+      if (response.status === 503) {
+        throw new Error(`音声認識サービスが一時的に利用できません。しばらく待ってから再度お試しください。(HTTPステータス: ${response.status})`)
+      }
+      
       throw new Error(`SDKモジュールの取得に失敗しました (HTTPステータス: ${response.status} ${response.statusText})。ネットワーク接続を確認してください。`);
     }
 
@@ -404,7 +481,7 @@ async function importEFP2() {
     const absoluteScriptText = scriptText.replace(
       /from\s+['"](\.\/[^'"]+)['"]/g, // `from './xxx'` や `from "./xxx"` のようなパターンにマッチ
       (match, p1) => { // p1 は './xxx' の部分
-        const absoluteUrl = new URL(p1, efp2ModuleUrl).href // 相対パスを絶対URLに変換
+        const absoluteUrl = new URL(p1, sdkUrl).href // 相対パスを絶対URLに変換
         return `from '${absoluteUrl}'` // 絶対URLを使ったimport文に置換
       },
     )

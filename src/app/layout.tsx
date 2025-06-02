@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import MobileContainer from '@/components/MobileContainer';
 
@@ -20,14 +21,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'シヤチハタ動物園デモページ',
     description: '音響認識技術を使用したデジタルスタンプラリーのデモンストレーション',
-    images: ['/images/logo.png'],
+    images: ['/images/hero1.png'],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'シヤチハタ動物園デモページ',
     description: '音響認識技術を使用したデジタルスタンプラリーのデモンストレーション',
-    images: ['/images/logo.png'],
+    images: ['/images/hero1.png'],
   },
 };
 
@@ -47,10 +48,23 @@ export default function RootLayout({
   return (
     <html lang='ja'>
       <head>
+        <link rel='icon' href='/favicon.ico' />
         <link rel='manifest' href='/manifest.json' />
-        <link rel='apple-touch-icon' href='/images/logo.png' />
+        <link rel='apple-touch-icon' href='/images/hero1.png' />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-18BSM8C75G"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-18BSM8C75G');
+          `}
+        </Script>
         <MobileContainer>{children}</MobileContainer>
       </body>
     </html>
