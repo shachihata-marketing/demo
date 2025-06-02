@@ -141,8 +141,8 @@ export const useEFP2 = (apiKey: string) => {
     } else {
       // iOS以外のデバイス（Android、PCなど）での設定。
       // こちらも最適な設定値は環境やSDKの要件により調整されることがあります。
-      audioConfig.echoCancellation = false
-      audioConfig.autoGainControl = true // Androidではtrueの方が安定する場合がある
+      audioConfig.echoCancellation = true // Androidでも有効化して安定性向上
+      audioConfig.autoGainControl = true
       audioConfig.noiseSuppression = true
     }
 
@@ -156,6 +156,28 @@ export const useEFP2 = (apiKey: string) => {
       })
       // 音声ストリームの取得に成功したら、音声処理の初期化を行います。
       await handleMediaDevicesOpened(mediaStream)
+      
+      // ストリームの状態を監視
+      const audioTracks = mediaStream.getAudioTracks()
+      if (audioTracks.length > 0) {
+        const track = audioTracks[0]
+        
+        // トラックの終了イベントを監視
+        track.addEventListener('ended', () => {
+          console.warn('マイクトラックが予期せず終了しました')
+          setError({
+            type: EFPErrorType.StreamStopFailed,
+            message: 'マイクが切断されました。再度お試しください。',
+            details: 'MediaStreamTrack ended unexpectedly'
+          })
+          recordStop()
+        })
+        
+        // トラックのミュート状態を監視
+        track.addEventListener('mute', () => {
+          console.warn('マイクがミュートされました')
+        })
+      }
       
       // 状態を更新
       setMeta(null) // 前回の認識結果をクリア
@@ -254,6 +276,16 @@ export const useEFP2 = (apiKey: string) => {
       }
       audioContext = new WindowAudioContext(); // AudioContextを生成
       
+      // AudioContextの状態を確認し、suspendedの場合はresumeする
+      if (audioContext.state === 'suspended') {
+        try {
+          await audioContext.resume()
+          console.log('AudioContextをresumeしました')
+        } catch (resumeError) {
+          console.error('AudioContext resumeエラー:', resumeError)
+        }
+      }
+      
       // audioContextが正常に初期化されたか（nullでないか）を確認します。
       // 通常、new演算子は成功すればインスタンスを返しますが、極稀なケースや
       // ブラウザのバグなどで失敗する可能性も考慮し、念のためチェックします。
@@ -309,7 +341,7 @@ export const useEFP2 = (apiKey: string) => {
         // 認識エンジンの出力をAudioContextの最終出力（通常はスピーカー）に接続。
         // これにより、マイク入力が（加工されていれば加工後の）スピーカーから聞こえるようになります。
         // 聞こえないようにする場合は、この行をコメントアウトするか、GainNodeを挟んでgainを0にします。
-        recognier.node.connect(audioContext.destination) 
+        // recognier.node.connect(audioContext.destination) // スピーカー出力は不要なのでコメントアウト 
       }
     } catch (error) {
       // このtryブロック内で発生したエラーの包括的なハンドリング

@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/auth-helpers-nextjs';
-import { useEFP2 } from '@/hooks/useEFP2';
+import { useEFP2, EFPErrorType } from '@/hooks/useEFP2';
 import Image from 'next/image';
 import { STAMPS } from '@/lib/stamps';
 
@@ -228,7 +228,21 @@ export default function Home() {
     console.error('EFP2 APIキーが設定されていません。.env.localファイルを確認してください。');
   }
 
-  const { meta, isRec, handleSwitchRec } = useEFP2(APIKEY);
+  const { meta, isRec, handleSwitchRec, error: efpError } = useEFP2(APIKEY);
+
+  // EFPエラーの監視
+  useEffect(() => {
+    if (efpError) {
+      console.error('EFPエラーを検出:', efpError);
+      // マイク切断エラーの場合は自動的に録音を停止
+      if (efpError.type === EFPErrorType.StreamStopFailed || efpError.message.includes('マイクが切断されました')) {
+        if (isRec) {
+          console.log('マイク切断を検出したため録音を停止します');
+          // isRecの状態は既にfalseになっているはずなので、UIの更新のみ
+        }
+      }
+    }
+  }, [efpError, isRec]);
 
   // グローバルエラーハンドラーの設定
   useEffect(() => {
@@ -718,12 +732,29 @@ export default function Home() {
   // 音響検知ボタンのハンドラー
   const handleAudioDetection = useCallback(async () => {
     console.log('音響検知ボタンがクリックされました。現在のisRec:', isRec);
-    await handleSwitchRec();
-    // 確実に変更が反映されるよう、少し遅延させてコンソールに状態を出力
-    setTimeout(() => {
-      console.log('音響検知ボタンクリック後 isRec:', isRec);
-    }, 500);
-  }, [isRec, handleSwitchRec]);
+    try {
+      await handleSwitchRec();
+      // 確実に変更が反映されるよう、少し遅延させてコンソールに状態を出力
+      setTimeout(() => {
+        console.log('音響検知ボタンクリック後 isRec:', isRec);
+      }, 500);
+    } catch (error) {
+      console.error('音声認識エラー:', error);
+      // エラータイプに応じたメッセージを表示
+      if (efpError) {
+        if (efpError.type === EFPErrorType.PermissionDenied) {
+          alert('マイクへのアクセスが拒否されました。\n\nブラウザの設定でマイクの使用を許可してから、もう一度お試しください。');
+          setShowPermissionGuide(true);
+        } else if (efpError.type === EFPErrorType.StreamStopFailed || efpError.message.includes('マイクが切断されました')) {
+          alert('マイクの接続が切れました。\n\nもう一度「音声検知スタート」ボタンを押してください。');
+        } else {
+          alert(`音声認識エラー: ${efpError.message}\n\nページを再読み込みしてから、もう一度お試しください。`);
+        }
+      } else {
+        alert('音声認識の開始に失敗しました。\n\nページを再読み込みしてから、もう一度お試しください。');
+      }
+    }
+  }, [isRec, handleSwitchRec, efpError]);
 
   // スタンプ保存ハンドラー
   const [isSharingStamp, setIsSharingStamp] = useState(false);
