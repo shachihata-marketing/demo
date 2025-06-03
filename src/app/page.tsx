@@ -25,6 +25,20 @@ import {
   type NetworkStatus 
 } from '@/lib/deviceCapabilities';
 
+// ExtendedNavigator interface for Network Information API
+interface ExtendedNavigator extends Navigator {
+  connection?: {
+    addEventListener?: (type: string, listener: EventListenerOrEventListenerObject) => void;
+    removeEventListener?: (type: string, listener: EventListenerOrEventListenerObject) => void;
+    effectiveType?: string;
+    downlink?: number;
+    rtt?: number;
+    saveData?: boolean;
+  };
+  mozConnection?: ExtendedNavigator['connection'];
+  webkitConnection?: ExtendedNavigator['connection'];
+}
+
 // ローカルストレージキー
 const STORAGE_KEY = 'collectedStamps';
 
@@ -48,6 +62,9 @@ type SafeResult<T> = {
 const safeLocalStorage = {
   get: (key: string): SafeResult<string> => {
     try {
+      if (typeof window === 'undefined') {
+        return { success: false, error: 'Not in browser environment', errorType: 'LocalStorageError' as ErrorType };
+      }
       const value = localStorage.getItem(key);
       return { success: true, data: value || undefined };
     } catch (error) {
@@ -61,6 +78,9 @@ const safeLocalStorage = {
 
   set: (key: string, value: string): SafeResult<void> => {
     try {
+      if (typeof window === 'undefined') {
+        return { success: false, error: 'Not in browser environment', errorType: 'LocalStorageError' as ErrorType };
+      }
       localStorage.setItem(key, value);
       return { success: true };
     } catch (error) {
@@ -74,6 +94,9 @@ const safeLocalStorage = {
 
   remove: (key: string): SafeResult<void> => {
     try {
+      if (typeof window === 'undefined') {
+        return { success: false, error: 'Not in browser environment', errorType: 'LocalStorageError' as ErrorType };
+      }
       localStorage.removeItem(key);
       return { success: true };
     } catch (error) {
@@ -90,6 +113,7 @@ const safeLocalStorage = {
 const errorMonitor = {
   log: (error: string, context: string, errorType: ErrorType = 'UnknownError') => {
     try {
+      if (typeof window === 'undefined') return;
       const timestamp = new Date().toISOString();
       const errorLog = {
         timestamp,
@@ -205,33 +229,41 @@ export default function Home() {
   const [isPrivateMode, setIsPrivateMode] = useState(false);
 
   // isCompletedはローカルストレージとの同期にのみ使用し、表示条件はcollectedStamps.lengthで判断
-  const [isCompleted, setIsCompleted] = useState<boolean>(() => {
-    try {
-      // ローカルストレージからもコンプリート状態を確認
-      return localStorage.getItem('isCompleted') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [allowAutoSignIn, setAllowAutoSignIn] = useState<boolean>(() => {
-    try {
-      // 'false'が明示的に保存されている場合のみ自動サインインを無効にする
-      // localStorage と sessionStorage の両方をチェック
-      const lsDisabled = localStorage.getItem('allowAutoSignIn') === 'false';
-      const ssDisabled = sessionStorage.getItem('allowAutoSignIn') === 'false';
-
-      // リセット直後かどうかを確認
-      const justReset = localStorage.getItem('justReset') === 'true' || sessionStorage.getItem('justReset') === 'true';
-
-      // どれかでfalseなら無効化
-      return !(lsDisabled || ssDisabled || justReset);
-    } catch {
-      return true;
-    }
-  });
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [allowAutoSignIn, setAllowAutoSignIn] = useState<boolean>(true);
+  const [hasLocalUser, setHasLocalUser] = useState<boolean>(false);
 
   // EFP2 APIキー - 環境変数から取得
   const APIKEY = process.env.NEXT_PUBLIC_EFP2_API_KEY || '';
+
+  // 初期化 - ローカルストレージから状態を復元
+  useEffect(() => {
+    // isCompleted の初期化
+    try {
+      const storedCompleted = localStorage.getItem('isCompleted') === 'true';
+      setIsCompleted(storedCompleted);
+    } catch {
+      // エラーは無視
+    }
+
+    // allowAutoSignIn の初期化
+    try {
+      const lsDisabled = localStorage.getItem('allowAutoSignIn') === 'false';
+      const ssDisabled = sessionStorage.getItem('allowAutoSignIn') === 'false';
+      const justReset = localStorage.getItem('justReset') === 'true' || sessionStorage.getItem('justReset') === 'true';
+      setAllowAutoSignIn(!(lsDisabled || ssDisabled || justReset));
+    } catch {
+      // エラーは無視
+    }
+
+    // hasLocalUser の初期化
+    try {
+      const localUserId = localStorage.getItem('localUserId');
+      setHasLocalUser(!!localUserId);
+    } catch {
+      // エラーは無視
+    }
+  }, []);
 
   // APIキーの検証
   useEffect(() => {
@@ -241,7 +273,7 @@ export default function Home() {
       // EFP2 APIキーが設定されていません
       alert('APIキーが設定されていません。管理者に連絡してください。');
     }
-  }, []);
+  }, [APIKEY, supabase]);
 
   const { meta, isRec, handleSwitchRec, error: efpError } = useEFP2(APIKEY);
 
@@ -395,7 +427,7 @@ export default function Home() {
   useEffect(() => {
     if (!networkStatus?.supported) return;
 
-    const extNav = navigator as any;
+    const extNav = navigator as ExtendedNavigator;
     const connection = extNav.connection || extNav.mozConnection || extNav.webkitConnection;
 
     if (!connection || !connection.addEventListener) return;
@@ -433,7 +465,9 @@ export default function Home() {
     connection.addEventListener('change', handleConnectionChange);
 
     return () => {
-      connection.removeEventListener('change', handleConnectionChange);
+      if (connection.removeEventListener) {
+        connection.removeEventListener('change', handleConnectionChange);
+      }
     };
   }, [networkStatus?.supported, deviceCapabilities, batteryStatus, isPrivateMode, networkStatus?.slowConnection]);
 
@@ -574,12 +608,13 @@ export default function Home() {
     let unmounted = false;
 
     // ローカルユーザーIDがある場合はオフラインモード
-    if (localStorage.getItem('localUserId')) {
+    if (typeof window !== 'undefined' && localStorage.getItem('localUserId')) {
       return () => {};
     }
 
     // リセット直後かどうかを確認
     const isJustReset = () => {
+      if (typeof window === 'undefined') return false;
       return localStorage.getItem('justReset') === 'true' || sessionStorage.getItem('justReset') === 'true';
     };
 
@@ -601,13 +636,14 @@ export default function Home() {
           setTimeout(() => reject(new Error('Session timeout')), 5000)
         );
         
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const result = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+        const { data: { session } } = result;
         
         // 終了フラグのチェック
         if (unmounted) return;
 
         // リセット直後の場合は認証処理をスキップ
-        if (localStorage.getItem('justReset') === 'true' || sessionStorage.getItem('justReset') === 'true') {
+        if (typeof window !== 'undefined' && (localStorage.getItem('justReset') === 'true' || sessionStorage.getItem('justReset') === 'true')) {
           localStorage.removeItem('justReset');
           sessionStorage.removeItem('justReset');
           setUser(null);
@@ -629,7 +665,7 @@ export default function Home() {
         // セッション読み込みエラーは無視
         console.warn('Session load failed:', error);
         // ローカルモードを促す
-        if (!localStorage.getItem('localUserId')) {
+        if (typeof window !== 'undefined' && !localStorage.getItem('localUserId')) {
           errorMonitor.log('Session load timeout, suggesting local mode', 'Session load', 'NetworkError');
         }
       }
@@ -665,7 +701,7 @@ export default function Home() {
     };
 
     return unmountCleanup;
-  }, [supabase.auth, allowAutoSignIn, user]);
+  }, [supabase, supabase.auth, allowAutoSignIn, user]);
 
   // 定期的なSupabaseへのバックアップ（30秒ごと）
   useEffect(() => {
@@ -845,8 +881,9 @@ export default function Home() {
               alert('オフラインモードで動作します。インターネット接続なしでスタンプを収集できます。');
               
               // ローカルユーザーIDを生成
-              const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+              const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
               localStorage.setItem('localUserId', localUserId);
+              setHasLocalUser(true);
               
               // 音声認識を開始（ローカルモード）
               await handleSwitchRec();
@@ -917,8 +954,9 @@ export default function Home() {
           
           // ローカルユーザーIDを生成（まだない場合）
           if (!localStorage.getItem('localUserId')) {
-            const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
             localStorage.setItem('localUserId', localUserId);
+            setHasLocalUser(true);
           }
           
           alert('オフラインモードで動作します。インターネット接続なしでスタンプを収集できます。');
@@ -1631,7 +1669,7 @@ export default function Home() {
 
         {/* 音声認識ボタンまたは開始ボタン */}
         <div className='fixed px-8 bottom-4 left-0 right-0 flex justify-center md:relative md:bottom-auto md:mt-8 md:mb-4 md:px-0'>
-          {user || localStorage.getItem('localUserId') ? (
+          {user || hasLocalUser ? (
             collectedStamps.length === STAMPS.length ? (
               <button
                 className='w-full h-12 md:h-16 rounded-full flex items-center justify-center bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm md:max-w-none mx-auto relative overflow-hidden group'

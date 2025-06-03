@@ -13,7 +13,7 @@ const SENSITIVE_PATTERNS = [
 ];
 
 export const logger = {
-  log: (...args: any[]) => {
+  log: (...args: unknown[]) => {
     if (process.env.NODE_ENV === 'production') return;
     
     const message = args.join(' ');
@@ -26,18 +26,18 @@ export const logger = {
     }
   },
   
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     console.warn(...args);
   },
   
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.error(...args);
   }
 };
 
 // グローバルconsoleを上書き（オプション）
 if (typeof window !== 'undefined') {
-  (window as any).originalConsole = {
+  (window as Window & { originalConsole?: { log: typeof console.log; debug: typeof console.debug; info: typeof console.info } }).originalConsole = {
     log: console.log,
     debug: console.debug,
     info: console.info

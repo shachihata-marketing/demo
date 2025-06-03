@@ -193,7 +193,7 @@ export async function checkDeviceCapabilities(): Promise<DeviceCapabilities> {
       language: navigator.language || '',
       screenResolution: `${screen.width || 0}x${screen.height || 0}`,
       viewport: `${window.innerWidth || 0}x${window.innerHeight || 0}`,
-      deviceMemory: (navigator as any).deviceMemory,
+      deviceMemory: 'deviceMemory' in navigator ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined,
       hardwareConcurrency: navigator.hardwareConcurrency,
     };
 
@@ -322,7 +322,7 @@ export async function detectPrivateMode(): Promise<boolean> {
     if ('webkitRequestFileSystem' in window) {
       try {
         await new Promise<void>((resolve, reject) => {
-          (window as any).webkitRequestFileSystem(
+          (window as Window & { webkitRequestFileSystem?: (type: number, size: number, successCallback: () => void, errorCallback: () => void) => void }).webkitRequestFileSystem!(
             0, 0,
             () => resolve(),
             () => reject()
@@ -336,7 +336,7 @@ export async function detectPrivateMode(): Promise<boolean> {
     // 4. Safari特有のチェック
     if (navigator.vendor && navigator.vendor.includes('Apple')) {
       try {
-        (window as any).openDatabase(null, null, null, null);
+        (window as Window & { openDatabase?: (name: null, version: null, displayName: null, estimatedSize: null) => void }).openDatabase!(null, null, null, null);
       } catch {
         return true;
       }

@@ -538,7 +538,7 @@ async function importEFP2(apiKey?: string) {
     if (typeof window !== 'undefined') {
       const originalLog = console.log;
       // 一時的にconsole.logを無効化
-      console.log = function(...args: any[]) {
+      console.log = function(...args: unknown[]) {
         const logString = args.join(' ');
         if (logString.includes('apikey:') || 
             logString.includes('dk:') || 
