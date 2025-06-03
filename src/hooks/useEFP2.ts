@@ -53,7 +53,7 @@ interface ExtendedWindow extends Window {
 let stream: MediaStream | null = null // マイクからの音声ストリームを保持する変数
 let audioContext: AudioContext | null = null // 音声処理を行うためのAudioContextオブジェクト
 let audioSampleRate: number | null = null // AudioContextのサンプルレート
-let recognier: Recognizer | null = null // EFPKit2 SDKの認識エンジンインスタンス
+let recognizer: Recognizer | null = null // EFPKit2 SDKの認識エンジンインスタンス
 let keepAliveInterval: NodeJS.Timeout | null = null // ストリーム維持用のインターバル
 
 /**
@@ -69,6 +69,14 @@ export const useEFP2 = (apiKey: string) => {
   // 本番環境での初期化確認
   useEffect(() => {
     // 本番環境ではログ出力を無効化
+    // APIキーの検証
+    if (!apiKey || apiKey.length < 10) {
+      setError({
+        type: EFPErrorType.SDKInitFailed,
+        message: 'APIキーが無効です。管理者に連絡してください。',
+        details: 'Invalid or missing API key'
+      });
+    }
   }, [apiKey])
   
   // 認識された音響パターンのメタデータを保持するstate。初期値はnull。
@@ -93,8 +101,6 @@ export const useEFP2 = (apiKey: string) => {
    * 録音の開始と停止を切り替える関数。
    * isRecの状態に基づいて、recordStartまたはrecordStopを呼び出します。
    * Androidデバイスの場合、状態変更をより確実に反映するための特別な処理が含まれています。
-   * @returns {Promise<void>} 処理が完了したことを示すPromise。
-   * @throws {Error} recordStartまたはrecordStop内で発生したエラーを再スローします。
    */
   const handleSwitchRec = async () => {
     try {
@@ -129,16 +135,30 @@ export const useEFP2 = (apiKey: string) => {
    * @throws {Error} マイクアクセスや音声ストリーム取得に関するエラー。
    */
   async function recordStart() {
-    // navigator.mediaDevices.getUserMedia APIの存在を確認。
-    // このAPIがないブラウザはマイク機能に対応していません。
-    const userMedia = navigator.mediaDevices.getUserMedia
-    if (userMedia == null) {
+    try {
+      // 前回のエラーをクリア
+      setError(null);
+      
+      // navigator.mediaDevicesの存在チェック
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        setError({
+          type: EFPErrorType.NotSupported,
+          message: "お使いのブラウザは、マイク機能に対応していません。",
+          details: "navigator.mediaDevices.getUserMedia is not available.",
+        });
+        return;
+      }
+      
+      // HTTPSチェックは削除 - HTTP環境でも動作可能にする
+      // 注意: 一部のブラウザではHTTPSが必要な場合がありますが、その場合はgetUserMediaでエラーが出ます
+    } catch (error) {
+      // 初期チェックエラー
       setError({
-        type: EFPErrorType.NotSupported,
-        message: "お使いのブラウザは、マイク機能に対応していません。",
-        details: "navigator.mediaDevices.getUserMedia is not available.",
-      })
-      return // これ以上処理を進められないため終了
+        type: EFPErrorType.Unknown,
+        message: "初期化エラーが発生しました。",
+        details: error instanceof Error ? error.message : String(error),
+      });
+      return;
     }
 
     // マイクから音声を取得する際のオーディオ設定。
@@ -158,10 +178,22 @@ export const useEFP2 = (apiKey: string) => {
       audioConfig.noiseSuppression = true
     } else {
       // iOS以外のデバイス（Android、PCなど）での設定。
-      // こちらも最適な設定値は環境やSDKの要件により調整されることがあります。
-      audioConfig.echoCancellation = true // Androidでも有効化して安定性向上
-      audioConfig.autoGainControl = true
-      audioConfig.noiseSuppression = true
+      // Android 13では音声処理機能の組み合わせによって問題が発生することがある
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isAndroid = /android/i.test(userAgent);
+      const androidVersion = isAndroid ? parseInt(userAgent.match(/android\s(\d+)/)?.[1] || '0') : 0;
+      
+      if (isAndroid && androidVersion >= 13) {
+        // Android 13以降の専用設定
+        audioConfig.echoCancellation = false // Android 13では無効化
+        audioConfig.autoGainControl = true
+        audioConfig.noiseSuppression = false // Android 13では無効化
+      } else {
+        // その他のAndroidやPCでの設定
+        audioConfig.echoCancellation = true
+        audioConfig.autoGainControl = true
+        audioConfig.noiseSuppression = true
+      }
     }
 
     try {
@@ -228,17 +260,55 @@ export const useEFP2 = (apiKey: string) => {
       // マイクの起動に失敗した場合のエラーハンドリング
       let errorType = EFPErrorType.StreamStartFailed;
       let message = "マイクの起動に失敗しました。";
-      // エラーオブジェクトのnameプロパティを確認し、ユーザーが許可しなかった場合のエラーかどうかを判定
-      if (error instanceof Error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
-        errorType = EFPErrorType.PermissionDenied;
-        message = "マイクの使用が許可されていません。";
+      const details = error instanceof Error ? error.toString() : String(error);
+      
+      if (error instanceof Error) {
+        switch (error.name) {
+          case 'NotAllowedError':
+          case 'PermissionDeniedError':
+            errorType = EFPErrorType.PermissionDenied;
+            message = "マイクの使用が許可されていません。ブラウザの設定を確認してください。";
+            break;
+          case 'NotFoundError':
+          case 'DevicesNotFoundError':
+            errorType = EFPErrorType.NotSupported;
+            message = "マイクが見つかりません。デバイスが正しく接続されているか確認してください。";
+            break;
+          case 'NotReadableError':
+          case 'TrackStartError':
+            errorType = EFPErrorType.StreamStartFailed;
+            message = "マイクが他のアプリケーションで使用されています。他のアプリを終了してから再度お試しください。";
+            break;
+          case 'OverconstrainedError':
+          case 'ConstraintNotSatisfiedError':
+            errorType = EFPErrorType.StreamStartFailed;
+            message = "お使いのデバイスが音声入力の要件を満たしていません。";
+            break;
+          case 'SecurityError':
+            errorType = EFPErrorType.PermissionDenied;
+            message = "セキュリティ設定によりマイクへのアクセスがブロックされています。";
+            break;
+          case 'AbortError':
+            errorType = EFPErrorType.StreamStartFailed;
+            message = "マイクの起動が中断されました。もう一度お試しください。";
+            break;
+          default:
+            // デバイス特有のエラーメッセージを追加
+            const userAgent = navigator.userAgent.toLowerCase();
+            const isAndroid = /android/i.test(userAgent);
+            const androidVersion = isAndroid ? parseInt(userAgent.match(/android\s(\d+)/)?.[1] || '0') : 0;
+            if (isAndroid && androidVersion >= 13) {
+              message = "Android 13でマイクの起動に失敗しました。他のアプリがマイクを使用していないか確認してください。";
+            }
+        }
       }
+      
       setError({
         type: errorType,
         message: message,
-        details: error instanceof Error ? error.toString() : String(error), // エラーの詳細情報を格納
-      })
-      throw error // エラーを呼び出し元に伝播
+        details: details,
+      });
+      throw error; // エラーを呼び出し元に伝播
     }
   }
 
@@ -251,6 +321,9 @@ export const useEFP2 = (apiKey: string) => {
    */
   function recordStop() {
     try {
+      // エラーをクリア
+      setError(null);
+      
       if (stream) { // 音声ストリームが存在する場合のみ処理
         // Androidデバイスでは、標準の停止処理だけでは完全にトラックが解放されないことがあるため、
         // 各トラックを個別に停止する処理を追加しています。
@@ -274,7 +347,7 @@ export const useEFP2 = (apiKey: string) => {
         stream = null
         audioContext = null
         audioSampleRate = null
-        recognier = null
+        recognizer = null
       }
       // keepAliveインターバルをクリア
       if (keepAliveInterval) {
@@ -314,7 +387,7 @@ export const useEFP2 = (apiKey: string) => {
         // どちらのAudioContextも見つからない場合は、ブラウザが非対応と判断します。
         setError({
           type: EFPErrorType.NotSupported,
-          message: "お使いのブラウザは音声処理機能に対応していません。",
+          message: "お使いのブラウザは音声処理機能に対応していません。最新のChrome、Safari、Firefoxをお使いください。",
           details: "AudioContext and webkitAudioContext are not available.",
         });
         stream.getTracks().forEach(track => track.stop()); // ストリームを停止
@@ -322,13 +395,29 @@ export const useEFP2 = (apiKey: string) => {
         throw new Error("AudioContext not supported"); // エラーをスローして処理中断
       }
       
-      // 本番環境（HTTPS）での追加設定
-      const audioContextOptions: AudioContextOptions = {}
-      if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-        // 本番環境では低レイテンシーモードを明示的に設定
-        audioContextOptions.latencyHint = 'interactive'
-        // サンプルレートを明示的に設定（デバイスのデフォルトに合わせる）
-        audioContextOptions.sampleRate = 48000
+      // AudioContext設定の最適化
+      const audioContextOptions: AudioContextOptions = {};
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+      const isAndroid = /android/i.test(userAgent);
+      const androidVersion = isAndroid ? parseInt(userAgent.match(/android\s(\d+)/)?.[1] || '0') : 0;
+      
+      // 環境に応じた設定
+      if (typeof window !== 'undefined') {
+        // 低レイテンシーモード
+        audioContextOptions.latencyHint = 'interactive';
+        
+        // デバイス別サンプルレート設定
+        if (isAndroid && androidVersion >= 13) {
+          // Android 13は自動設定（デバイスのデフォルトを使用）
+          // audioContextOptions.sampleRate は設定しない
+        } else if (isIOS) {
+          // iOSは48kHz固定
+          audioContextOptions.sampleRate = 48000;
+        } else {
+          // その他は48kHz
+          audioContextOptions.sampleRate = 48000;
+        }
       }
       
       audioContext = new WindowAudioContext(audioContextOptions); // AudioContextを生成
@@ -384,23 +473,23 @@ export const useEFP2 = (apiKey: string) => {
       // EFPKit2 SDKから認識エンジン作成関数を取得
       const create_recognizer = efp2.default
       // 認識エンジンを非同期で作成。AudioContext、フィンガープリントデータURL、APIキーを渡します。
-      recognier = await create_recognizer(audioContext, fpUrl, apiKey)
-      if (recognier) { // 認識エンジンが正常に作成された場合
+      recognizer = await create_recognizer(audioContext, fpUrl, apiKey)
+      if (recognizer) { // 認識エンジンが正常に作成された場合
         if (audioSampleRate) {
           // 認識エンジンに現在のAudioContextのサンプルレートを設定
-          recognier.change_samplerate(audioSampleRate)
+          recognizer.change_samplerate(audioSampleRate)
         }
         // 音声が検出された際のコールバック関数を設定
-        recognier.on_detect = function (result: { meta: string; pos: number }) {
+        recognizer.on_detect = function (result: { meta: string; pos: number }) {
           // 検出されたメタデータをstateに保存。これによりUIが更新されます。
           setMeta(result.meta)
         }
-        // 音声入力(source)を認識エンジン(recognier.node)に接続
-        source.connect(recognier.node)
+        // 音声入力(source)を認識エンジン(recognizer.node)に接続
+        source.connect(recognizer.node)
         // 認識エンジンの出力をAudioContextの最終出力（通常はスピーカー）に接続。
         // これにより、マイク入力が（加工されていれば加工後の）スピーカーから聞こえるようになります。
         // 聞こえないようにする場合は、この行をコメントアウトするか、GainNodeを挟んでgainを0にします。
-        // recognier.node.connect(audioContext.destination) // スピーカー出力は不要なのでコメントアウト 
+        // recognizer.node.connect(audioContext.destination) // スピーカー出力は不要なのでコメントアウト 
       }
     } catch (error) {
       // このtryブロック内で発生したエラーの包括的なハンドリング
@@ -442,12 +531,26 @@ export const useEFP2 = (apiKey: string) => {
  * SDKのJavaScriptファイルをフェッチし、相対パスを絶対パスに書き換えた後、
  * Blob URLを作成してimport()構文でモジュールとして読み込みます。
  * これにより、CORSの問題を回避しつつ、外部スクリプトをESモジュールとして扱えます。
- * @param {string} apiKey - EFP2 APIキー（SDKダウンロード時の認証に使用される可能性）
- * @returns {Promise<any>} インポートされたSDKモジュール。
- * @throws {Error} SDKのフェッチ失敗、テキスト化失敗、Blob URLからのインポート失敗など。
  */
 async function importEFP2(apiKey?: string) {
   try {
+    // EFP2 SDKのログを事前に抑制
+    if (typeof window !== 'undefined') {
+      const originalLog = console.log;
+      // 一時的にconsole.logを無効化
+      console.log = function(...args: any[]) {
+        const logString = args.join(' ');
+        if (logString.includes('apikey:') || 
+            logString.includes('dk:') || 
+            logString.includes('campaign_id:') ||
+            logString.includes('sdkInitialized:') ||
+            logString.includes('need_decode_meta:')) {
+          return;
+        }
+        originalLog.apply(console, args);
+      };
+    }
+    
     // SDKのURLを生成（APIキーはクエリパラメータとして含める）
     const sdkUrl = getEfp2ModuleUrl(apiKey)
     
@@ -474,13 +577,24 @@ async function importEFP2(apiKey?: string) {
     }
 
     // レスポンスボディをテキストとして取得します。これがSDKのJavaScriptコードです。
-    const scriptText = await response.text()
+    let scriptText = await response.text()
+    
+    // SDKコード内のconsole.log呼び出しを無効化
+    // APIキーを含むログ出力を抑制
+    scriptText = scriptText.replace(
+      /console\.(log|debug|info)\s*\([^)]*apikey[^)]*\)/gi,
+      '/* console.log suppressed */'
+    );
+    scriptText = scriptText.replace(
+      /console\.(log|debug|info)\s*\([^)]*\b(dk|campaign_id|sdkInitialized|need_decode_meta)\b[^)]*\)/gi,
+      '/* console.log suppressed */'
+    );
     // SDK内部で使われている可能性のある相対パスのimport文 (例: `from './utils'`) を、
     // 元のSDK URLを基準とした絶対パスに書き換えます。
     // これにより、Blob URLからモジュールを読み込む際に相対パスの解決が正しく行われるようになります。
     const absoluteScriptText = scriptText.replace(
       /from\s+['"](\.\/[^'"]+)['"]/g, // `from './xxx'` や `from "./xxx"` のようなパターンにマッチ
-      (match, p1) => { // p1 は './xxx' の部分
+      (_match, p1) => { // p1 は './xxx' の部分
         const absoluteUrl = new URL(p1, sdkUrl).href // 相対パスを絶対URLに変換
         return `from '${absoluteUrl}'` // 絶対URLを使ったimport文に置換
       },

@@ -13,6 +13,17 @@ import type { User } from '@supabase/auth-helpers-nextjs';
 import { useEFP2, EFPErrorType } from '@/hooks/useEFP2';
 import Image from 'next/image';
 import { STAMPS } from '@/lib/stamps';
+import { 
+  checkDeviceCapabilities, 
+  checkBatteryStatus, 
+  checkNetworkStatus, 
+  detectPrivateMode,
+  generateCompatibilityWarnings,
+  getBrowserInfo,
+  type DeviceCapabilities,
+  type BatteryStatus,
+  type NetworkStatus 
+} from '@/lib/deviceCapabilities';
 
 // ローカルストレージキー
 const STORAGE_KEY = 'collectedStamps';
@@ -185,6 +196,13 @@ export default function Home() {
   // const [locationError, setLocationError] = useState<string | null>(null);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
+  
+  // 互換性チェック関連のstate
+  const [deviceCapabilities, setDeviceCapabilities] = useState<DeviceCapabilities | null>(null);
+  const [batteryStatus, setBatteryStatus] = useState<BatteryStatus | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus | null>(null);
+  const [compatibilityWarnings, setCompatibilityWarnings] = useState<string[]>([]);
+  const [isPrivateMode, setIsPrivateMode] = useState(false);
 
   // isCompletedはローカルストレージとの同期にのみ使用し、表示条件はcollectedStamps.lengthで判断
   const [isCompleted, setIsCompleted] = useState<boolean>(() => {
@@ -212,9 +230,8 @@ export default function Home() {
     }
   });
 
-  // 本番環境と同じように環境変数を使用
-  // 一時的にハードコード（本番環境での緊急対応）
-  const APIKEY = 'eMaYe9yDYUY2wQWsCnlUehaiTjAmpP9KRm9nx4apBnL3E6VhL51E8qCOD+K6sva3EtboAQQ9a0Zq2YFbmOOyDa1vEhBxAPSGkuGYErAjFiTdGx20X9go8f+Q0YvCkD+Xq1gqu4Ks1/qaGD7M/J6UKzHo9NqEGj+ah55c9vL206Rs4hXcgTn9L2K9SunHh1wDAsdA704RbTnzRNQ2bqSIKblf63VFZEBkwdb/DEU+l04XXwXyGEjV1n69Dy31ZIoB';
+  // EFP2 APIキー - 環境変数から取得
+  const APIKEY = process.env.NEXT_PUBLIC_EFP2_API_KEY || '';
 
   // APIキーの検証
   useEffect(() => {
@@ -246,6 +263,179 @@ export default function Home() {
   useEffect(() => {
     setupGlobalErrorHandlers();
   }, []);
+
+  // デバイス互換性チェック（初回マウント時）
+  useEffect(() => {
+    const performCompatibilityCheck = async () => {
+      try {
+        // デバイス能力チェック
+        const capabilities = await checkDeviceCapabilities();
+        setDeviceCapabilities(capabilities);
+
+        // プライベートモード検出
+        const privateMode = await detectPrivateMode();
+        setIsPrivateMode(privateMode);
+
+        // バッテリー状態チェック
+        const battery = await checkBatteryStatus();
+        setBatteryStatus(battery);
+
+        // ネットワーク状態チェック
+        const network = checkNetworkStatus();
+        setNetworkStatus(network);
+
+        // 警告メッセージ生成
+        const warnings = generateCompatibilityWarnings(capabilities, battery, network);
+        
+        // プライベートモード警告を追加
+        if (privateMode) {
+          warnings.unshift('プライベートブラウジングモードが検出されました。スタンプデータが保存されません。');
+        }
+
+        setCompatibilityWarnings(warnings);
+
+        // ブラウザ情報をログに記録（デバッグ用）
+        const browserInfo = getBrowserInfo();
+        if (TEST_MODE) {
+          console.log('Browser Info:', browserInfo);
+          console.log('Device Capabilities:', capabilities);
+        }
+
+        // 重大な問題がある場合のみアラート表示
+        if (!capabilities.microphone || !capabilities.webAudio) {
+          setTimeout(() => {
+            alert('音声機能が利用できません。ブラウザの設定を確認してください。');
+          }, 1000);
+        }
+      } catch (error) {
+        // 互換性チェックのエラーは静かに処理
+        errorMonitor.log(
+          error instanceof Error ? error.message : String(error),
+          'Compatibility check failed',
+          'UnknownError'
+        );
+      }
+    };
+
+    performCompatibilityCheck();
+  }, []);
+
+  // ネットワーク状態の監視
+  useEffect(() => {
+    const handleOnline = () => {
+      const network = checkNetworkStatus();
+      setNetworkStatus(network);
+      
+      // オンライン復帰時の処理
+      if (network.online && deviceCapabilities && batteryStatus) {
+        const warnings = generateCompatibilityWarnings(deviceCapabilities, batteryStatus, network);
+        if (isPrivateMode) {
+          warnings.unshift('プライベートブラウジングモードが検出されました。スタンプデータが保存されません。');
+        }
+        setCompatibilityWarnings(warnings);
+      }
+    };
+
+    const handleOffline = () => {
+      const network = checkNetworkStatus();
+      setNetworkStatus(network);
+      
+      // オフライン時の警告
+      setCompatibilityWarnings(prev => {
+        const filtered = prev.filter(w => !w.includes('インターネット接続'));
+        return ['インターネット接続がありません。', ...filtered];
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [deviceCapabilities, batteryStatus, isPrivateMode]);
+
+  // バッテリー状態の定期監視（省電力モード検出）
+  useEffect(() => {
+    if (!batteryStatus?.supported) return;
+
+    const checkBatteryInterval = setInterval(async () => {
+      try {
+        const battery = await checkBatteryStatus();
+        setBatteryStatus(battery);
+
+        // バッテリー状態に変化があった場合、警告を更新
+        if (deviceCapabilities && networkStatus) {
+          const warnings = generateCompatibilityWarnings(deviceCapabilities, battery, networkStatus);
+          if (isPrivateMode) {
+            warnings.unshift('プライベートブラウジングモードが検出されました。スタンプデータが保存されません。');
+          }
+          setCompatibilityWarnings(warnings);
+
+          // クリティカルレベルの場合は即座にアラート
+          if (battery.criticalLevel && !batteryStatus.criticalLevel) {
+            alert('バッテリー残量が非常に少なくなっています（5%以下）。データ損失を防ぐため、充電してください。');
+          }
+        }
+      } catch (error) {
+        // バッテリーチェックエラーは静かに処理
+        errorMonitor.log(
+          error instanceof Error ? error.message : String(error),
+          'Battery check failed',
+          'UnknownError'
+        );
+      }
+    }, 60000); // 1分ごとにチェック
+
+    return () => clearInterval(checkBatteryInterval);
+  }, [batteryStatus?.supported, deviceCapabilities, networkStatus, isPrivateMode, batteryStatus?.criticalLevel]);
+
+  // ネットワーク接続タイプの監視（Network Information API）
+  useEffect(() => {
+    if (!networkStatus?.supported) return;
+
+    const extNav = navigator as any;
+    const connection = extNav.connection || extNav.mozConnection || extNav.webkitConnection;
+
+    if (!connection || !connection.addEventListener) return;
+
+    const handleConnectionChange = () => {
+      try {
+        const network = checkNetworkStatus();
+        setNetworkStatus(network);
+
+        // 接続タイプ変更時の警告更新
+        if (deviceCapabilities && batteryStatus) {
+          const warnings = generateCompatibilityWarnings(deviceCapabilities, batteryStatus, network);
+          if (isPrivateMode) {
+            warnings.unshift('プライベートブラウジングモードが検出されました。スタンプデータが保存されません。');
+          }
+          setCompatibilityWarnings(warnings);
+
+          // 低速接続への切り替え時にアラート
+          if (network.slowConnection && !networkStatus.slowConnection) {
+            setTimeout(() => {
+              alert('通信速度が低下しています。音声認識が不安定になる可能性があります。');
+            }, 500);
+          }
+        }
+      } catch (error) {
+        // 接続変更エラーは静かに処理
+        errorMonitor.log(
+          error instanceof Error ? error.message : String(error),
+          'Connection change handler failed',
+          'NetworkError'
+        );
+      }
+    };
+
+    connection.addEventListener('change', handleConnectionChange);
+
+    return () => {
+      connection.removeEventListener('change', handleConnectionChange);
+    };
+  }, [networkStatus?.supported, deviceCapabilities, batteryStatus, isPrivateMode, networkStatus?.slowConnection]);
 
   const [collectedStamps, setCollectedStamps] = useState<number[]>(() => {
     const stored = safeLocalStorage.get(STORAGE_KEY);
@@ -343,7 +533,22 @@ export default function Home() {
     async (userId: string, stamps: number[], isCompleted: boolean) => {
       // バックグラウンドで非同期に実行、エラーがあってもゲームは継続
       try {
-        await supabase.from('user_stamps').upsert(
+        // オンライン状態を確認
+        if (!navigator.onLine) {
+          console.log('Offline mode: Supabase sync skipped');
+          return;
+        }
+        
+        // Supabase設定が有効な場合のみ同期
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey || supabaseUrl === 'your_supabase_url') {
+          // Supabase未設定の場合は静かにスキップ
+          return;
+        }
+        
+        const { error } = await supabase.from('user_stamps').upsert(
           {
             user_id: userId,
             stamps: stamps,
@@ -351,8 +556,14 @@ export default function Home() {
           },
           { onConflict: 'user_id' }
         );
+        
+        if (error) {
+          console.warn('Supabase sync warning:', error.message);
+          // エラーがあってもローカルストレージで継続
+        }
       } catch (_error) {
         // エラーは記録するだけで、ゲームには影響させない
+        console.warn('Supabase sync failed, continuing with local storage:', _error);
       }
     },
     [supabase]
@@ -361,6 +572,11 @@ export default function Home() {
   // ユーザー認証状態の監視
   useEffect(() => {
     let unmounted = false;
+
+    // ローカルユーザーIDがある場合はオフラインモード
+    if (localStorage.getItem('localUserId')) {
+      return () => {};
+    }
 
     // リセット直後かどうかを確認
     const isJustReset = () => {
@@ -379,9 +595,14 @@ export default function Home() {
 
     const loadSession = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        // タイムアウト付きでセッション取得
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
+        );
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        
         // 終了フラグのチェック
         if (unmounted) return;
 
@@ -404,8 +625,13 @@ export default function Home() {
         } else {
           setUser(null);
         }
-      } catch {
+      } catch (error) {
         // セッション読み込みエラーは無視
+        console.warn('Session load failed:', error);
+        // ローカルモードを促す
+        if (!localStorage.getItem('localUserId')) {
+          errorMonitor.log('Session load timeout, suggesting local mode', 'Session load', 'NetworkError');
+        }
       }
     };
 
@@ -443,15 +669,19 @@ export default function Home() {
 
   // 定期的なSupabaseへのバックアップ（30秒ごと）
   useEffect(() => {
-    if (!user) return;
+    // ユーザーがいる場合のみバックアップ（ユーザーなしでもゲームは動作）
+    if (user) {
+      const intervalId = setInterval(() => {
+        // ネットワークがオンラインの場合のみ同期
+        if (navigator.onLine) {
+          const completed = collectedStamps.length === STAMPS.length;
+          // 非ブロッキングでバックアップ
+          syncWithSupabase(user.id, collectedStamps, completed);
+        }
+      }, 30000); // 30秒ごと
 
-    const intervalId = setInterval(() => {
-      const completed = collectedStamps.length === STAMPS.length;
-      // 非ブロッキングでバックアップ
-      syncWithSupabase(user.id, collectedStamps, completed);
-    }, 30000); // 30秒ごと
-
-    return () => clearInterval(intervalId);
+      return () => clearInterval(intervalId);
+    }
   }, [user, collectedStamps, syncWithSupabase]);
 
   // Supabaseからのデータ取得を試みる（ローカルストレージが優先）
@@ -489,16 +719,17 @@ export default function Home() {
 
   // collectedStampsの変更をバックグラウンドでSupabaseに同期
   useEffect(() => {
-    if (!user) return;
+    // ユーザーがいる場合のみ同期（ユーザーなしでもゲームは動作）
+    if (user) {
+      // デバウンスタイマーを使用して、頻繁な更新を避ける
+      const timer = setTimeout(() => {
+        const completed = collectedStamps.length === STAMPS.length;
+        // 非ブロッキングでSupabaseに同期
+        syncWithSupabase(user.id, collectedStamps, completed);
+      }, 1000); // 1秒後に同期
 
-    // デバウンスタイマーを使用して、頻繁な更新を避ける
-    const timer = setTimeout(() => {
-      const completed = collectedStamps.length === STAMPS.length;
-      // 非ブロッキングでSupabaseに同期
-      syncWithSupabase(user.id, collectedStamps, completed);
-    }, 1000); // 1秒後に同期
-
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    }
   }, [collectedStamps, user, syncWithSupabase]);
 
   // マイク許可の状態を確認する関数
@@ -533,7 +764,14 @@ export default function Home() {
       setMicPermissionDenied(false); // リセット
 
       // 先にマイク許可状態を確認
-      const canRequestPermission = await checkMicrophonePermission();
+      let canRequestPermission = true;
+      try {
+        canRequestPermission = await checkMicrophonePermission();
+      } catch (permError) {
+        console.warn('Permission check failed, proceeding anyway:', permError);
+        // Android 13では権限APIが不安定なので、エラーでも続行
+        canRequestPermission = true;
+      }
 
       if (!canRequestPermission) {
         // 許可が既に拒否されている場合は、設定ガイドを表示して早期リターン
@@ -545,13 +783,38 @@ export default function Home() {
       let micPermissionGranted = false;
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
-          // マイクへのアクセスを要求
-          await navigator.mediaDevices.getUserMedia({ audio: true });
+          // マイクへのアクセスを要求 - Android 13対応
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            } 
+          });
           // マイク許可が成功しました
           setMicPermissionDenied(false);
           micPermissionGranted = true;
-        } catch (_micError) {
+          // ストリームをすぐに停止（権限確認のみなので）
+          stream.getTracks().forEach(track => track.stop());
+        } catch (micError: unknown) {
           // マイク許可エラー
+          console.error('Microphone permission error:', micError);
+          
+          // Android 13でのエラー詳細を確認
+          let errorMessage = 'マイクの許可が必要です。';
+          if (micError instanceof Error) {
+            if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+              errorMessage = 'マイクの使用が拒否されました。ブラウザの設定から許可してください。';
+            } else if (micError.name === 'NotFoundError') {
+              errorMessage = 'マイクが見つかりません。デバイスが接続されているか確認してください。';
+            } else if (micError.name === 'NotReadableError' || micError.name === 'TrackStartError') {
+              errorMessage = 'マイクが他のアプリで使用中です。他のアプリを終了してから再度お試しください。';
+            } else if (micError.name === 'OverconstrainedError') {
+              errorMessage = 'お使いのデバイスはこのアプリに対応していない可能性があります。';
+            }
+          }
+          
+          alert(errorMessage);
           setMicPermissionDenied(true);
           setShowPermissionGuide(true);
           setIsLoading(false);
@@ -571,28 +834,39 @@ export default function Home() {
             // エラーの詳細をログに記録
             errorMonitor.log(error.message || 'Unknown auth error', 'Anonymous sign-in failed', 'NetworkError');
 
-            // より具体的なエラーメッセージを表示
+            // ネットワークエラーやタイムアウトの場合は、ローカルモードで継続
+            if (error.message?.includes('Failed to fetch') || 
+                error.message?.includes('NetworkError') || 
+                error.message?.includes('timeout') ||
+                error.message?.includes('ERR_INTERNET_DISCONNECTED') ||
+                error.message?.includes('ERR_NAME_NOT_RESOLVED')) {
+              
+              console.warn('Supabase connection failed, continuing with offline mode');
+              alert('オフラインモードで動作します。インターネット接続なしでスタンプを収集できます。');
+              
+              // ローカルユーザーIDを生成
+              const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+              localStorage.setItem('localUserId', localUserId);
+              
+              // 音声認識を開始（ローカルモード）
+              await handleSwitchRec();
+              setIsLoading(false);
+              return;
+            }
+
+            // その他のエラーメッセージ処理
             let errorMessage = 'ログインに失敗しました。';
 
             if (error.message?.includes('Invalid API key')) {
               errorMessage =
-                'Supabase APIキーが無効です。\n\nSupabaseダッシュボードから最新のanon keyを取得して、.env.localファイルのNEXT_PUBLIC_SUPABASE_ANON_KEYを更新してください。';
-              // Supabase Anon Key が無効です
-
-              // ローカルモードで続行
-              // Supabase認証に失敗したため、ローカルモードで動作
-              const dummyUserId = `local-user-${Date.now()}`;
-              setUser({ id: dummyUserId } as User);
-
-              // サインイン成功したら自動サインインを許可
-              localStorage.setItem('allowAutoSignIn', 'true');
-              setAllowAutoSignIn(true);
-
-              // 音声認識を開始
+                'Supabase APIキーが無効です。ローカルストレージモードで動作します。\n\n完全な機能を利用するには、Supabaseダッシュボードから最新のanon keyを取得して、.env.localファイルのNEXT_PUBLIC_SUPABASE_ANON_KEYを更新してください。';
+              
+              // Supabaseなしでローカルモードで継続
+              console.warn('Supabase auth failed, continuing with local storage mode');
+              
+              // 音声認識を開始（ユーザーIDなし）
               await handleSwitchRec();
               return;
-            } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-              errorMessage = 'ネットワーク接続を確認してください。Wi-Fiまたはモバイルデータが有効になっているか確認してください。';
             } else if (error.message?.includes('rate limit')) {
               errorMessage = 'アクセスが集中しています。しばらく待ってから再度お試しください。';
             } else if (error.message?.includes('CORS') || error.message?.includes('blocked')) {
@@ -614,15 +888,19 @@ export default function Home() {
           // user_stampsテーブルに初期レコードを作成
           if (data.user) {
             try {
-              await supabase.from('user_stamps').upsert({
+              const { error: upsertError } = await supabase.from('user_stamps').upsert({
                 user_id: data.user.id,
                 stamps: [],
                 is_completed: false,
                 is_redeemed: false
               }, { onConflict: 'user_id' });
-              // user_stamps初期レコード作成成功
+              
+              if (upsertError) {
+                console.warn('user_stamps initialization warning:', upsertError.message);
+                // エラーがあっても継続
+              }
             } catch (_error) {
-              // user_stamps初期レコード作成エラー
+              console.warn('user_stamps initialization failed:', _error);
               // エラーがあっても継続
             }
           }
@@ -633,21 +911,39 @@ export default function Home() {
 
           // 音声認識を開始
           await handleSwitchRec();
-        } catch {
-          // 予期しないエラー - ローカルモードで継行
-          const dummyUserId = `local-user-${Date.now()}`;
-          setUser({ id: dummyUserId } as User);
-
-          // サインイン成功したら自動サインインを許可
-          localStorage.setItem('allowAutoSignIn', 'true');
-          setAllowAutoSignIn(true);
-
-          // 音声認識を開始
+        } catch (unexpectedError) {
+          // 予期しないエラー - ローカルモードで継続
+          console.error('Unexpected error during sign in, continuing with local mode:', unexpectedError);
+          
+          // ローカルユーザーIDを生成（まだない場合）
+          if (!localStorage.getItem('localUserId')) {
+            const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('localUserId', localUserId);
+          }
+          
+          alert('オフラインモードで動作します。インターネット接続なしでスタンプを収集できます。');
+          
+          // 音声認識を開始（ローカルモード）
           await handleSwitchRec();
+          setIsLoading(false);
         }
       }
-    } catch {
-      alert('エラーが発生しました。再度試してください。');
+    } catch (error: unknown) {
+      console.error('handleAnonymousSignUp error:', error);
+      
+      // エラーの詳細を確認して適切なメッセージを表示
+      let errorMessage = 'エラーが発生しました。';
+      if (error instanceof Error) {
+        if (error.message.includes('getUserMedia')) {
+          errorMessage = 'マイクへのアクセスに失敗しました。デバイスの設定を確認してください。';
+        } else if (error.message.includes('AudioContext')) {
+          errorMessage = '音声処理の初期化に失敗しました。別のブラウザでお試しください。';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'ネットワークエラーが発生しました。接続を確認してください。';
+        }
+      }
+      
+      alert(errorMessage + '\n\n詳細: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
     }
@@ -690,10 +986,17 @@ export default function Home() {
                   await handleSwitchRec();
                 }
 
+                // 通常の遷移を試みる
                 router.push('/complete');
               } catch (e) {
                 errorMonitor.log(String(e), 'Failed to navigate to complete page', 'UnknownError');
-                // 遷移できない場合も静かに失敗
+                // 遷移できない場合は直接URL遷移
+                try {
+                  window.location.href = '/complete';
+                } catch {
+                  // それでも失敗した場合はユーザーに通知
+                  alert('コンプリートページへの遷移に失敗しました。画面下部の「コンプリートページへ」ボタンをタップしてください。');
+                }
               }
             }, 2000);
           } catch (error) {
@@ -830,7 +1133,7 @@ export default function Home() {
       setAllowAutoSignIn(false);
 
       // ローカルストレージのクリア - キーを定数として一元管理
-      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn', 'isCouponUsed', 'hasSpunRoulette', 'localUserId'];
+      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn', 'isCouponUsed', 'hasSpunRoulette', 'localUserId', 'stateBackup', 'errorLogs'];
 
       // Supabase関連の認証トークンを検出して削除リストに追加
       const supabaseKeyPatterns = ['supabase-auth-token', 'sb-'];
@@ -919,7 +1222,7 @@ export default function Home() {
       setAllowAutoSignIn(false);
 
       // ローカルストレージのクリア - キーを定数として一元管理
-      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn', 'isCouponUsed', 'hasSpunRoulette', 'localUserId'];
+      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn', 'isCouponUsed', 'hasSpunRoulette', 'localUserId', 'stateBackup', 'errorLogs'];
 
       // Supabase関連の認証トークンを検出して削除リストに追加
       const supabaseKeyPatterns = ['supabase-auth-token', 'sb-'];
@@ -980,16 +1283,16 @@ export default function Home() {
   // useEffectでisCompletedの更新ロジックを追加
   useEffect(() => {
     // スタンプが10個集まった場合はisCompletedをtrueに設定
-    if (collectedStamps.length === STAMPS.length && !isCompleted && user) {
+    if (collectedStamps.length === STAMPS.length && !isCompleted) {
       setIsCompleted(true);
       localStorage.setItem('isCompleted', 'true');
 
-      // バックグラウンドでSupabaseにも反映（エラーがあってもゲームは継続）
+      // バックグラウンドでSupabaseにも反映（ユーザーがいる場合のみ）
       if (user) {
         syncWithSupabase(user.id, collectedStamps, true);
       }
     }
-  }, [collectedStamps, isCompleted, user, supabase, syncWithSupabase]);
+  }, [collectedStamps, isCompleted, user, syncWithSupabase]);
 
   return (
     <div className='min-h-screen bg-gradient-to-b from-orange-50 via-white to-yellow-50 flex flex-col'>
@@ -1042,6 +1345,31 @@ export default function Home() {
           transition={{ duration: 0.8 }}>
           <Image src='/images/hero1.png' alt='top' width={2048} height={1000} className='w-full h-auto object-cover' />
         </motion.div>
+
+        {/* 互換性警告表示 */}
+        {compatibilityWarnings.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className='w-full bg-gradient-to-r from-red-50 to-yellow-50 border-2 border-red-300 text-gray-700 px-4 py-3 rounded-xl relative mx-auto max-w-full shadow-md mb-4'
+            role='alert'>
+            <div className='flex items-start'>
+              <span className='text-2xl mr-2'>⚠️</span>
+              <div className='flex-1'>
+                <p className='text-sm font-bold text-red-600 mb-2'>環境に関する注意事項</p>
+                <ul className='text-xs space-y-1'>
+                  {compatibilityWarnings.map((warning, index) => (
+                    <li key={index} className='flex items-start'>
+                      <span className='mr-1'>•</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1303,7 +1631,7 @@ export default function Home() {
 
         {/* 音声認識ボタンまたは開始ボタン */}
         <div className='fixed px-8 bottom-4 left-0 right-0 flex justify-center md:relative md:bottom-auto md:mt-8 md:mb-4 md:px-0'>
-          {user ? (
+          {user || localStorage.getItem('localUserId') ? (
             collectedStamps.length === STAMPS.length ? (
               <button
                 className='w-full h-12 md:h-16 rounded-full flex items-center justify-center bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-xl transform transition-all active:scale-95 hover:shadow-2xl max-w-sm md:max-w-none mx-auto relative overflow-hidden group'

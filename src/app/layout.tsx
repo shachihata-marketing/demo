@@ -63,6 +63,45 @@ export default function RootLayout({
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-18BSM8C75G');
+            
+            // EFP2 SDKのログを抑制（開発環境・本番環境両方）
+            if (typeof window !== 'undefined') {
+              const originalLog = console.log;
+              const originalDebug = console.debug;
+              const originalInfo = console.info;
+              
+              // console.logのオーバーライド
+              console.log = function(...args) {
+                // APIキーやセンシティブな情報を含むログをフィルタ
+                const logString = args.join(' ');
+                if (logString.includes('apikey:') || 
+                    logString.includes('dk:') || 
+                    logString.includes('campaign_id:') ||
+                    logString.includes('sdkInitialized:') ||
+                    logString.includes('need_decode_meta:') ||
+                    logString.includes('eMaYe9yDYUY')) {
+                  return; // これらのログは出力しない
+                }
+                originalLog.apply(console, args);
+              };
+              
+              // debug/infoも同様にフィルタ
+              console.debug = function(...args) {
+                const logString = args.join(' ');
+                if (logString.includes('apikey:') || logString.includes('dk:')) {
+                  return;
+                }
+                originalDebug.apply(console, args);
+              };
+              
+              console.info = function(...args) {
+                const logString = args.join(' ');
+                if (logString.includes('apikey:') || logString.includes('dk:')) {
+                  return;
+                }
+                originalInfo.apply(console, args);
+              };
+            }
           `}
         </Script>
         <MobileContainer>{children}</MobileContainer>
