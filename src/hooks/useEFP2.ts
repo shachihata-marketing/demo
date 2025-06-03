@@ -3,13 +3,15 @@ import { useState, useEffect } from "react"
 // 音響フィンガープリントSDK (EFPKit2) のCDN URL。このURLからSDKが読み込まれます。
 // 本番環境ではクエリパラメータでAPIキーを渡す必要がある
 const getEfp2ModuleUrl = (apiKey?: string) => {
+  // 2.3が503エラーの場合、別のバージョンを試すことができます
+  // const baseUrl = "https://websdk-cdn.airymedia.net/sdk/efpkit2/2.2/efpkit2.js"
   const baseUrl = "https://websdk-cdn.airymedia.net/sdk/efpkit2/2.3/efpkit2.js"
   
   // APIキーが提供されている場合は常にクエリパラメータに含める
   if (apiKey) {
     // EFP2のドキュメントに基づいて正しいパラメータ名を使用
     // 'apikey' が最も一般的な形式
-    return `${baseUrl}?apikey=${encodeURIComponent(apiKey)}`
+    return `${baseUrl}?apikey=${apiKey}`
   }
   
   // APIキーがない場合 - 本番環境ではログを出さない
