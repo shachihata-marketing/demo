@@ -13,16 +13,16 @@ import type { User } from '@supabase/auth-helpers-nextjs';
 import { useEFP2, EFPErrorType } from '@/hooks/useEFP2';
 import Image from 'next/image';
 import { STAMPS } from '@/lib/stamps';
-import { 
-  checkDeviceCapabilities, 
-  checkBatteryStatus, 
-  checkNetworkStatus, 
+import {
+  checkDeviceCapabilities,
+  checkBatteryStatus,
+  checkNetworkStatus,
   detectPrivateMode,
   generateCompatibilityWarnings,
   getBrowserInfo,
   type DeviceCapabilities,
   type BatteryStatus,
-  type NetworkStatus 
+  type NetworkStatus,
 } from '@/lib/deviceCapabilities';
 
 // ExtendedNavigator interface for Network Information API
@@ -220,7 +220,7 @@ export default function Home() {
   // const [locationError, setLocationError] = useState<string | null>(null);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
-  
+
   // 互換性チェック関連のstate
   const [deviceCapabilities, setDeviceCapabilities] = useState<DeviceCapabilities | null>(null);
   const [batteryStatus, setBatteryStatus] = useState<BatteryStatus | null>(null);
@@ -268,7 +268,7 @@ export default function Home() {
   // APIキーの検証
   useEffect(() => {
     // APIキー確認 (本番環境デバッグ) - コンソールログを削除
-    
+
     if (!APIKEY) {
       // EFP2 APIキーが設定されていません
       alert('APIキーが設定されていません。管理者に連絡してください。');
@@ -318,7 +318,7 @@ export default function Home() {
 
         // 警告メッセージ生成
         const warnings = generateCompatibilityWarnings(capabilities, battery, network);
-        
+
         // プライベートモード警告を追加
         if (privateMode) {
           warnings.unshift('プライベートブラウジングモードが検出されました。スタンプデータが保存されません。');
@@ -341,11 +341,7 @@ export default function Home() {
         }
       } catch (error) {
         // 互換性チェックのエラーは静かに処理
-        errorMonitor.log(
-          error instanceof Error ? error.message : String(error),
-          'Compatibility check failed',
-          'UnknownError'
-        );
+        errorMonitor.log(error instanceof Error ? error.message : String(error), 'Compatibility check failed', 'UnknownError');
       }
     };
 
@@ -357,7 +353,7 @@ export default function Home() {
     const handleOnline = () => {
       const network = checkNetworkStatus();
       setNetworkStatus(network);
-      
+
       // オンライン復帰時の処理
       if (network.online && deviceCapabilities && batteryStatus) {
         const warnings = generateCompatibilityWarnings(deviceCapabilities, batteryStatus, network);
@@ -371,10 +367,10 @@ export default function Home() {
     const handleOffline = () => {
       const network = checkNetworkStatus();
       setNetworkStatus(network);
-      
+
       // オフライン時の警告
-      setCompatibilityWarnings(prev => {
-        const filtered = prev.filter(w => !w.includes('インターネット接続'));
+      setCompatibilityWarnings((prev) => {
+        const filtered = prev.filter((w) => !w.includes('インターネット接続'));
         return ['インターネット接続がありません。', ...filtered];
       });
     };
@@ -412,11 +408,7 @@ export default function Home() {
         }
       } catch (error) {
         // バッテリーチェックエラーは静かに処理
-        errorMonitor.log(
-          error instanceof Error ? error.message : String(error),
-          'Battery check failed',
-          'UnknownError'
-        );
+        errorMonitor.log(error instanceof Error ? error.message : String(error), 'Battery check failed', 'UnknownError');
       }
     }, 60000); // 1分ごとにチェック
 
@@ -454,11 +446,7 @@ export default function Home() {
         }
       } catch (error) {
         // 接続変更エラーは静かに処理
-        errorMonitor.log(
-          error instanceof Error ? error.message : String(error),
-          'Connection change handler failed',
-          'NetworkError'
-        );
+        errorMonitor.log(error instanceof Error ? error.message : String(error), 'Connection change handler failed', 'NetworkError');
       }
     };
 
@@ -572,16 +560,16 @@ export default function Home() {
           console.log('Offline mode: Supabase sync skipped');
           return;
         }
-        
+
         // Supabase設定が有効な場合のみ同期
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        
+
         if (!supabaseUrl || !supabaseKey || supabaseUrl === 'your_supabase_url') {
           // Supabase未設定の場合は静かにスキップ
           return;
         }
-        
+
         const { error } = await supabase.from('user_stamps').upsert(
           {
             user_id: userId,
@@ -590,7 +578,7 @@ export default function Home() {
           },
           { onConflict: 'user_id' }
         );
-        
+
         if (error) {
           console.warn('Supabase sync warning:', error.message);
           // エラーがあってもローカルストレージで継続
@@ -632,13 +620,13 @@ export default function Home() {
       try {
         // タイムアウト付きでセッション取得
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 5000)
-        );
-        
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
-        const { data: { session } } = result;
-        
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 5000));
+
+        const result = (await Promise.race([sessionPromise, timeoutPromise])) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+        const {
+          data: { session },
+        } = result;
+
         // 終了フラグのチェック
         if (unmounted) return;
 
@@ -820,22 +808,22 @@ export default function Home() {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           // マイクへのアクセスを要求 - Android 13対応
-          const stream = await navigator.mediaDevices.getUserMedia({ 
+          const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: true,
               noiseSuppression: true,
-              autoGainControl: true
-            } 
+              autoGainControl: true,
+            },
           });
           // マイク許可が成功しました
           setMicPermissionDenied(false);
           micPermissionGranted = true;
           // ストリームをすぐに停止（権限確認のみなので）
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach((track) => track.stop());
         } catch (micError: unknown) {
           // マイク許可エラー
           console.error('Microphone permission error:', micError);
-          
+
           // Android 13でのエラー詳細を確認
           let errorMessage = 'マイクの許可が必要です。';
           if (micError instanceof Error) {
@@ -849,7 +837,7 @@ export default function Home() {
               errorMessage = 'お使いのデバイスはこのアプリに対応していない可能性があります。';
             }
           }
-          
+
           alert(errorMessage);
           setMicPermissionDenied(true);
           setShowPermissionGuide(true);
@@ -871,20 +859,21 @@ export default function Home() {
             errorMonitor.log(error.message || 'Unknown auth error', 'Anonymous sign-in failed', 'NetworkError');
 
             // ネットワークエラーやタイムアウトの場合は、ローカルモードで継続
-            if (error.message?.includes('Failed to fetch') || 
-                error.message?.includes('NetworkError') || 
-                error.message?.includes('timeout') ||
-                error.message?.includes('ERR_INTERNET_DISCONNECTED') ||
-                error.message?.includes('ERR_NAME_NOT_RESOLVED')) {
-              
+            if (
+              error.message?.includes('Failed to fetch') ||
+              error.message?.includes('NetworkError') ||
+              error.message?.includes('timeout') ||
+              error.message?.includes('ERR_INTERNET_DISCONNECTED') ||
+              error.message?.includes('ERR_NAME_NOT_RESOLVED')
+            ) {
               console.warn('Supabase connection failed, continuing with offline mode');
               alert('オフラインモードで動作します。インターネット接続なしでスタンプを収集できます。');
-              
+
               // ローカルユーザーIDを生成
               const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
               localStorage.setItem('localUserId', localUserId);
               setHasLocalUser(true);
-              
+
               // 音声認識を開始（ローカルモード）
               await handleSwitchRec();
               setIsLoading(false);
@@ -897,10 +886,10 @@ export default function Home() {
             if (error.message?.includes('Invalid API key')) {
               errorMessage =
                 'Supabase APIキーが無効です。ローカルストレージモードで動作します。\n\n完全な機能を利用するには、Supabaseダッシュボードから最新のanon keyを取得して、.env.localファイルのNEXT_PUBLIC_SUPABASE_ANON_KEYを更新してください。';
-              
+
               // Supabaseなしでローカルモードで継続
               console.warn('Supabase auth failed, continuing with local storage mode');
-              
+
               // 音声認識を開始（ユーザーIDなし）
               await handleSwitchRec();
               return;
@@ -921,17 +910,20 @@ export default function Home() {
 
           // 認証成功
           // 認証成功
-          
+
           // user_stampsテーブルに初期レコードを作成
           if (data.user) {
             try {
-              const { error: upsertError } = await supabase.from('user_stamps').upsert({
-                user_id: data.user.id,
-                stamps: [],
-                is_completed: false,
-                is_redeemed: false
-              }, { onConflict: 'user_id' });
-              
+              const { error: upsertError } = await supabase.from('user_stamps').upsert(
+                {
+                  user_id: data.user.id,
+                  stamps: [],
+                  is_completed: false,
+                  is_redeemed: false,
+                },
+                { onConflict: 'user_id' }
+              );
+
               if (upsertError) {
                 console.warn('user_stamps initialization warning:', upsertError.message);
                 // エラーがあっても継続
@@ -951,16 +943,16 @@ export default function Home() {
         } catch (unexpectedError) {
           // 予期しないエラー - ローカルモードで継続
           console.error('Unexpected error during sign in, continuing with local mode:', unexpectedError);
-          
+
           // ローカルユーザーIDを生成（まだない場合）
           if (!localStorage.getItem('localUserId')) {
             const localUserId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
             localStorage.setItem('localUserId', localUserId);
             setHasLocalUser(true);
           }
-          
+
           alert('オフラインモードで動作します。インターネット接続なしでスタンプを収集できます。');
-          
+
           // 音声認識を開始（ローカルモード）
           await handleSwitchRec();
           setIsLoading(false);
@@ -968,7 +960,7 @@ export default function Home() {
       }
     } catch (error: unknown) {
       console.error('handleAnonymousSignUp error:', error);
-      
+
       // エラーの詳細を確認して適切なメッセージを表示
       let errorMessage = 'エラーが発生しました。';
       if (error instanceof Error) {
@@ -980,7 +972,7 @@ export default function Home() {
           errorMessage = 'ネットワークエラーが発生しました。接続を確認してください。';
         }
       }
-      
+
       alert(errorMessage + '\n\n詳細: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
@@ -1010,7 +1002,6 @@ export default function Home() {
 
         // バックアップ作成
         autoRecovery.backupState(updatedStamps, updatedStamps.length === STAMPS.length);
-
 
         // 全てのスタンプを集めた場合
         if (updatedStamps.length === STAMPS.length) {
@@ -1171,7 +1162,17 @@ export default function Home() {
       setAllowAutoSignIn(false);
 
       // ローカルストレージのクリア - キーを定数として一元管理
-      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn', 'isCouponUsed', 'hasSpunRoulette', 'localUserId', 'stateBackup', 'errorLogs'];
+      const keysToRemove = [
+        STORAGE_KEY,
+        'isExchanged',
+        'isCompleted',
+        'allowAutoSignIn',
+        'isCouponUsed',
+        'hasSpunRoulette',
+        'localUserId',
+        'stateBackup',
+        'errorLogs',
+      ];
 
       // Supabase関連の認証トークンを検出して削除リストに追加
       const supabaseKeyPatterns = ['supabase-auth-token', 'sb-'];
@@ -1260,7 +1261,17 @@ export default function Home() {
       setAllowAutoSignIn(false);
 
       // ローカルストレージのクリア - キーを定数として一元管理
-      const keysToRemove = [STORAGE_KEY, 'isExchanged', 'isCompleted', 'allowAutoSignIn', 'isCouponUsed', 'hasSpunRoulette', 'localUserId', 'stateBackup', 'errorLogs'];
+      const keysToRemove = [
+        STORAGE_KEY,
+        'isExchanged',
+        'isCompleted',
+        'allowAutoSignIn',
+        'isCouponUsed',
+        'hasSpunRoulette',
+        'localUserId',
+        'stateBackup',
+        'errorLogs',
+      ];
 
       // Supabase関連の認証トークンを検出して削除リストに追加
       const supabaseKeyPatterns = ['supabase-auth-token', 'sb-'];
@@ -1339,7 +1350,7 @@ export default function Home() {
         <motion.div
           className='absolute top-20 left-4 text-4xl pointer-events-none'
           animate={{
-            y: [0, -20, 0],
+            y: [-40, -20, -40],
             x: [0, 10, 0],
           }}
           transition={{
@@ -1393,7 +1404,7 @@ export default function Home() {
             className='w-full bg-gradient-to-r from-red-50 to-yellow-50 border-2 border-red-300 text-gray-700 px-4 py-3 rounded-xl relative mx-auto max-w-full shadow-md mb-4'
             role='alert'>
             <div className='flex items-start'>
-              <span className='text-2xl mr-2'>⚠️</span>
+              <span className='text-2xl mr-3 flex-shrink-0'>⚠️</span>
               <div className='flex-1'>
                 <p className='text-sm font-bold text-red-600 mb-2'>環境に関する注意事項</p>
                 <ul className='text-xs space-y-1'>
@@ -1413,45 +1424,46 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className='w-full bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-orange-300 text-gray-700 px-4 py-3 rounded-xl relative mx-auto max-w-full shadow-md'
+          className='w-full bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-orange-300 text-gray-700 px-4 py-3 relative mx-auto max-w-full shadow-md'
           role='alert'>
           <div className='flex items-center mb-2'>
-            <motion.span animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 2 }} className='text-2xl mr-2'>
+            <motion.span animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 2 }} className='text-2xl mr-3 flex-shrink-0'>
               🎪
             </motion.span>
             <p className='text-lg font-bold text-orange-600'>ご来園のお客様へご案内</p>
           </div>
           <div className='space-y-1'>
             <p className='text-sm flex items-start'>
-              <span className='text-lg mr-2'>①</span>
+              <span className='text-lg mr-3 flex-shrink-0'>①</span>
               <span>
                 動物の近くや園内各所で
-                <span className='font-bold text-lg text-[#004ea2] mx-1'>「スタートボタン」</span>
-                を押してください。
+                <br />
+                <span className='font-bold text-md mr-1 text-[#004ea2]'>「スタートボタン」</span>
+                を押してください
               </span>
             </p>
-            <p className='text-sm flex items-start'>
-              <span className='text-lg mr-2'>②</span>
+            <p className='text-sm flex items-start items-center'>
+              <span className='text-lg mr-3 flex-shrink-0'>②</span>
               <span>マイクの使用を許可してください</span>
             </p>
             <p className='text-sm flex items-start'>
-              <span className='text-lg mr-2'>③</span>
+              <span className='text-lg mr-3 flex-shrink-0'>③</span>
               <span>
-                下部のボタンが<span className='font-bold text-red-600 text-lg mx-1'>「赤い停止ボタン」</span>に変わっていることを確認してください
+                下部のボタンが<span className='font-bold text-red-600 text-md mx-1'>「赤い停止ボタン」</span>に変わっていることを確認してください
               </span>
             </p>
             <p className='text-sm flex items-start'>
-              <span className='text-lg mr-2'>④</span>
+              <span className='text-lg mr-3 flex-shrink-0'>④</span>
               <span>音声を検知中はブラウザから移動しないでください</span>
             </p>
             <p className='text-sm flex items-start'>
-              <span className='text-lg mr-2'>⑤</span>
+              <span className='text-lg mr-3 flex-shrink-0'>⑤</span>
               <span>ブラウザのプライベートモードではスタンプを取得できません</span>
             </p>
           </div>
         </motion.div>
 
-        {/* スタンプと線路のグリッド */}
+        {/* スタンプ*/}
         <motion.div
           className='w-full max-w-2xl my-4 p-4 bg-white shadow-lg rounded-2xl'
           initial={{ scale: 0.95, opacity: 0 }}
@@ -1461,7 +1473,7 @@ export default function Home() {
           <div className='flex mb-6 items-center justify-center'>
             <motion.div className='flex items-center' initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.5 }}>
               <motion.span
-                className='text-4xl mr-2'
+                className='text-4xl mr-3 flex-shrink-0'
                 animate={{
                   y: [0, -5, 0],
                   rotate: [-10, 10, -10],
@@ -1488,7 +1500,7 @@ export default function Home() {
                 <p className='text-sm font-semibold'>限定画像・クーポンをGET！</p>
               </motion.div>
               <motion.span
-                className='text-4xl ml-2'
+                className='text-4xl ml-3 flex-shrink-0'
                 animate={{
                   y: [0, -5, 0],
                   rotate: [10, -10, 10],
@@ -1558,8 +1570,8 @@ export default function Home() {
                 {/* エリア名 */}
                 <div className='text-center mt-1'>
                   <motion.span
-                    className={`${collectedStamps.includes(stamp.id) ? 'text-green-600 font-bold' : 'text-gray-500'}`}
-                    style={{ fontSize: '10px', lineHeight: 0.8 }}
+                    className={`${collectedStamps.includes(stamp.id) ? 'text-green-600 font-bold' : 'text-gray-500 font-bold'}`}
+                    style={{ fontSize: '12px', lineHeight: 0.8 }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.1 }}>
@@ -1724,11 +1736,9 @@ export default function Home() {
         {/* スタンプ獲得アニメーション */}
         <AnimatePresence>{newStamp && <StampCollectionAnimation stamp={newStamp} onComplete={() => setNewStamp(null)} />}</AnimatePresence>
 
-
         {/* テスト用: スタンプ数操作ボタン */}
         {TEST_MODE && (
           <div className='fixed bottom-20 left-0 right-0 flex justify-center gap-2 z-50 flex-wrap md:relative md:bottom-auto md:mt-4 md:mb-4'>
-
             <button
               onClick={() => {
                 // 4個のスタンプを全て設定

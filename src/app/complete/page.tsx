@@ -51,7 +51,7 @@ export default function CompletePage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   // 現在ログインしているユーザーのIDを保持するstate
   const [userId, setUserId] = useState<string | null>(null);
-  // ルーレットを回したかどうかを示すstate  
+  // ルーレットを回したかどうかを示すstate
   const [hasSpunRoulette] = useState<boolean>(() => {
     try {
       const spun = localStorage.getItem('hasSpunRoulette');
@@ -98,7 +98,7 @@ export default function CompletePage() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        
+
         if (!user) {
           console.log('Supabase認証なし - ローカルモードで動作');
           // ローカルユーザーIDを生成（クーポン使用のため）
@@ -120,12 +120,12 @@ export default function CompletePage() {
             console.log('user_stampsレコードが存在しないため作成します');
             const localStamps = localStorage.getItem('collectedStamps');
             const stamps = localStamps ? JSON.parse(localStamps) : [];
-            
+
             await supabase.from('user_stamps').insert({
               user_id: user.id,
               stamps: stamps,
               is_completed: stamps.length === 4,
-              is_redeemed: false
+              is_redeemed: false,
             });
           } else if (stampData) {
             if (stampData.stamps) {
@@ -161,23 +161,27 @@ export default function CompletePage() {
   const handleExchange = () => {
     setShowConfirmation(true);
   };
-  
+
   /**
    * ルーレットを回す処理
    */
   const handleSpinRoulette = () => {
     setShowRoulette(true);
   };
-  
+
   /**
    * ルーレット完了時の処理
    */
   const handleRouletteComplete = (prize: string) => {
-    setWonPrize(prize);
+    console.log(`Complete page received prize: "${prize}"`);
+    console.log(`Prize includes ハズレ: ${prize.includes('ハズレ')}`);
+    console.log(`Prize === '😢 ハズレ': ${prize === '😢 ハズレ'}`);
     
+    setWonPrize(prize);
+
     setTimeout(() => {
       // ハズレの場合は別のメッセージ
-      if (prize === '😢 ハズレ') {
+      if (prize.includes('ハズレ')) {
         alert(`残念でした！\n\n😢 ハズレ 😢\n\nまた次回チャレンジしてください！`);
       } else {
         alert(`おめでとうございます！\n\n🎉 ${prize} 🎉\n\n受付でこの画面をお見せください。`);
@@ -220,7 +224,8 @@ export default function CompletePage() {
 
     // バックグラウンドでSupabaseを更新（エラーがあってもユーザー体験に影響しない）
     if (userId) {
-      supabase.from('user_stamps')
+      supabase
+        .from('user_stamps')
         .update({ is_redeemed: true })
         .eq('user_id', userId)
         .then(({ error }) => {
@@ -232,7 +237,6 @@ export default function CompletePage() {
 
     setIsLoading(false);
   };
-
 
   /**
    * コンプリート画像 (complete_image.JPG) を保存または共有する非同期関数。
@@ -440,9 +444,9 @@ export default function CompletePage() {
 
   return (
     <div className='min-h-screen bg-white px-4 py-8'>
-        <div className='flex items-center w-full mb-6'>
-          <motion.div
-            className='mr-3'
+      <div className='flex items-center w-full mb-6'>
+        <motion.div
+          className='mr-3'
           animate={{
             y: [0, -2, 0, 2, 0],
             rotate: [-1, 1, -1],
@@ -458,21 +462,25 @@ export default function CompletePage() {
           <div className='text-gray-600 text-xl font-bold relative z-0'>
             <span className='relative inline-block'>おめでとうございます 🎉</span>
           </div>
-          <p className='text-gray-600 text-sm'>全ての音声スタンプを集めました！記念画像はこちら👇</p>
+          <p className='text-gray-600 text-sm'>
+            全ての音声スタンプを集めました！
+            <br />
+            記念画像はこちら👇
+          </p>
         </div>
       </div>
 
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className='relative overflow-hidden transform-gpu hover:shadow-3xl transition-all mb-6'
-          style={{
-            perspective: '1000px',
-            transformStyle: 'preserve-3d',
-          }}>
-          <div
-            className='p-4 bg-gradient-to-r from-green-100 via-yellow-100 to-green-100 border-8 border-green-600 rounded-2xl'
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.3 }}
+        className='relative overflow-hidden transform-gpu hover:shadow-3xl transition-all mb-6'
+        style={{
+          perspective: '1000px',
+          transformStyle: 'preserve-3d',
+        }}>
+        <div
+          className='p-4 bg-gradient-to-r from-green-100 via-yellow-100 to-green-100 border-8 border-green-600 rounded-2xl'
           style={{
             boxShadow: '0 15px 30px rgba(34, 197, 94, 0.3), 0 10px 15px rgba(34, 197, 94, 0.2)',
             transform: 'rotateX(5deg)',
@@ -497,37 +505,31 @@ export default function CompletePage() {
         </div>
       </motion.div>
 
-        <div className='flex gap-4 flex-wrap justify-center mb-8'>
-          <button
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className={`px-8 py-4 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-3 ${isDownloading ? 'opacity-80 cursor-wait' : ''}`}
-            style={{ backgroundColor: '#22c55e' }}>
-            {isDownloading ? (
-              <svg className='w-6 h-6 animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' />
-              </svg>
-            ) : (
-              <DownloadIcon />
-            )}
-            {isDownloading ? 'ダウンロード中...' : 'コンプリート画像を保存'}
-          </button>
-        </div>
+      <div className='flex gap-4 flex-wrap justify-center mb-8'>
+        <button
+          onClick={handleDownload}
+          disabled={isDownloading}
+          className={`px-8 py-4 bg-green-500 text-white text-lg rounded-full shadow-lg transition-all active:scale-95 flex items-center gap-3 ${isDownloading ? 'opacity-80 cursor-wait' : ''}`}
+          style={{ backgroundColor: '#22c55e' }}>
+          {isDownloading ? (
+            <svg className='w-6 h-6 animate-pulse' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' />
+            </svg>
+          ) : (
+            <DownloadIcon />
+          )}
+          {isDownloading ? 'ダウンロード中...' : 'コンプリート画像を保存'}
+        </button>
+      </div>
 
-        {/* 30%OFFクーポン */}
-        <div className='w-full mb-8 bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl shadow-xl border-2 border-orange-200'>
+      {/* 30%OFFクーポン */}
+      <div className='w-full mb-8 bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl shadow-xl border-2 border-orange-200'>
         <h3 className='text-xl font-bold text-center text-orange-600 mb-4'>🎉 コンプリート特典 🎉</h3>
         <p className='text-gray-700 text-center mb-6'>売店でご利用いただける30%OFFクーポンをプレゼント！</p>
-        
+
         <div className='flex justify-center mb-6'>
           <div className='relative'>
-            <Image
-              src='/images/coupon.png'
-              alt='30%OFFクーポン'
-              width={360}
-              height={270}
-              className='rounded-lg shadow-lg'
-            />
+            <Image src='/images/coupon.png' alt='30%OFFクーポン' width={360} height={270} className='rounded-lg shadow-lg' />
             {isExchanged && (
               <div className='absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center'>
                 <div className='bg-white px-6 py-3 rounded-full shadow-lg'>
@@ -538,14 +540,12 @@ export default function CompletePage() {
           </div>
         </div>
 
-        <p className='text-sm text-gray-600 text-center mb-4'>
-          売店にてこの画面を係員にお見せください
-        </p>
+        <p className='text-sm text-gray-600 text-center mb-4'>売店にてこの画面を係員にお見せください</p>
 
         <div className='bg-gray-100 p-4 rounded-lg border border-gray-300'>
           <p className='text-sm text-gray-600 text-center mb-2'>↓係員用 使用確認ボタン</p>
           <p className='text-xs text-red-600 text-center mb-4'>来園者様自身で操作しないでください</p>
-          
+
           {!isExchanged ? (
             <button
               onClick={handleExchange}
@@ -556,7 +556,12 @@ export default function CompletePage() {
               {isLoading ? (
                 <>
                   <svg className='w-5 h-5 animate-spin' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                    />
                   </svg>
                   <span>処理中...</span>
                 </>
@@ -565,102 +570,80 @@ export default function CompletePage() {
               )}
             </button>
           ) : (
-            <div className='w-full px-8 py-3 bg-gray-300 text-gray-600 rounded-full text-center'>
-              ✓ クーポン使用済み
-            </div>
+            <div className='w-full px-8 py-3 bg-gray-300 text-gray-600 rounded-full text-center'>✓ クーポン使用済み</div>
           )}
         </div>
-        
-        {isExchanged && (
-          <p className='text-sm text-green-600 text-center mt-4 font-semibold'>
-            素敵なお買い物ありがとうございました！
-          </p>
-        )}
+
+        {isExchanged && <p className='text-sm text-green-600 text-center mt-4 font-semibold'>素敵なお買い物ありがとうございました！</p>}
       </div>
 
-        {/* エクストラボーナスセクション */}
-        <div className='w-full mb-8 bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-xl border-2 border-purple-200'>
-          <h3 className='text-xl font-bold text-center text-purple-600 mb-4'>🎰 エクストラボーナス 🎰</h3>
-          <p className='text-gray-700 text-center mb-6'>さらに特別なプレゼントが当たるチャンス！</p>
-          
-          {!showRoulette ? (
-            <>
-              <motion.div
-                className='flex justify-center mb-4'
-                whileHover={!hasSpunRoulette ? { scale: 1.05 } : {}}
-                whileTap={!hasSpunRoulette ? { scale: 0.95 } : {}}>
-                {!hasSpunRoulette ? (
-                  <button
-                    onClick={handleSpinRoulette}
-                    className='px-12 py-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xl font-bold rounded-full shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3'>
-                    <span className='text-2xl'>🎲</span>
-                    <span>ルーレットを回す</span>
-                    <span className='text-2xl'>🎯</span>
-                  </button>
-                ) : (
-                  <div className='px-12 py-6 bg-gray-300 text-gray-600 text-xl font-bold rounded-full shadow-lg flex items-center gap-3'>
-                    <span className='text-2xl'>✅</span>
-                    <span>ルーレット済み</span>
-                    <span className='text-2xl'>🎁</span>
-                  </div>
-                )}
-              </motion.div>
-              
-              {wonPrize && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`mt-4 p-6 rounded-lg shadow-lg border-2 ${
-                    wonPrize === '😢 ハズレ' 
-                      ? 'bg-gradient-to-r from-gray-100 to-gray-200 border-gray-300' 
-                      : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-300'
-                  }`}>
-                  <p className={`text-center text-xl font-bold mb-3 ${
-                    wonPrize === '😢 ハズレ' ? 'text-gray-700' : 'text-purple-700'
-                  }`}>
-                    {wonPrize === '😢 ハズレ' ? '😢 残念！ 😢' : '🎊 獲得した賞品 🎊'}
-                  </p>
-                  <div className='bg-white p-4 rounded-md shadow-inner'>
-                    <p className='text-center text-2xl mb-2'>
-                      {wonPrize}
-                    </p>
-                    {wonPrize !== '😢 ハズレ' && (
-                      <p className='text-center text-sm text-gray-600'>
-                        受付でこの画面をお見せください
-                      </p>
-                    )}
-                    {wonPrize === '😢 ハズレ' && (
-                      <p className='text-center text-sm text-gray-600'>
-                        また次回チャレンジしてください！
-                      </p>
-                    )}
-                  </div>
-                  {wonPrize !== '😢 ハズレ' && (
-                    <p className='text-center text-sm text-purple-600 mt-3 font-semibold'>
-                      受付でこの画面をお見せください
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className='flex justify-center'>
-              <RouletteWheel 
-                onSpinComplete={handleRouletteComplete} 
-              />
-            </motion.div>
-          )}
-          
-          <p className='text-sm text-gray-600 text-center mt-4'>
-            ※ おひとり様1回限り
-          </p>
-        </div>
+      {/* エクストラボーナスセクション */}
+      <div className='w-full mb-8 bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-xl border-2 border-purple-200'>
+        <h3 className='text-xl font-bold text-center text-purple-600 mb-4'>🎰 エクストラボーナス 🎰</h3>
+        <p className='text-gray-700 text-center mb-6'>
+          さらに特別なプレゼントが当たる
+          <br />
+          チャンス！
+        </p>
 
-        <div className='w-full mb-8'>
+        {!showRoulette ? (
+          <>
+            <motion.div
+              className='flex justify-center mb-4'
+              whileHover={!hasSpunRoulette ? { scale: 1.05 } : {}}
+              whileTap={!hasSpunRoulette ? { scale: 0.95 } : {}}>
+              {!hasSpunRoulette ? (
+                <button
+                  onClick={handleSpinRoulette}
+                  className='px-12 py-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-md font-bold rounded-full shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3'>
+                  <span className='text-2xl'>🎲</span>
+                  <span className='text-md'>ルーレットを回す</span>
+                  <span className='text-2xl'>🎯</span>
+                </button>
+              ) : (
+                <div className='px-12 py-6 bg-gray-300 text-gray-600 text-xl font-bold rounded-full shadow-lg flex items-center gap-3'>
+                  <span className='text-2xl'>✅</span>
+                  <span>ルーレット済み</span>
+                  <span className='text-2xl'>🎁</span>
+                </div>
+              )}
+            </motion.div>
+
+            {wonPrize && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`mt-4 p-6 rounded-lg shadow-lg border-2 ${
+                  wonPrize === '😢 ハズレ'
+                    ? 'bg-gradient-to-r from-gray-100 to-gray-200 border-gray-300'
+                    : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-300'
+                }`}>
+                <p className={`text-center text-xl font-bold mb-3 ${wonPrize === '😢 ハズレ' ? 'text-gray-700' : 'text-purple-700'}`}>
+                  {wonPrize === '😢 ハズレ' ? '😢 残念！ 😢' : '🎊 獲得した賞品 🎊'}
+                </p>
+                <div className='bg-white p-4 rounded-md shadow-inner'>
+                  <p className='text-center text-2xl mb-2'>{wonPrize}</p>
+                  {wonPrize !== '😢 ハズレ' && <p className='text-center text-sm text-gray-600'>受付でこの画面をお見せください</p>}
+                  {wonPrize === '😢 ハズレ' && <p className='text-center text-sm text-gray-600'>また次回チャレンジしてください！</p>}
+                </div>
+                {wonPrize !== '😢 ハズレ' && <p className='text-center text-sm text-purple-600 mt-3 font-semibold'>受付でこの画面をお見せください</p>}
+              </motion.div>
+            )}
+          </>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className='flex justify-center'>
+            <RouletteWheel onSpinComplete={handleRouletteComplete} />
+          </motion.div>
+        )}
+
+        <p className='text-sm text-gray-600 text-center mt-4'>※ おひとり様1回限り</p>
+      </div>
+
+      <div className='w-full mb-8'>
         <p className='text-gray-600 text-center text-lg font-semibold mb-4'>🎬 シヤチハタ動物園の魅力をご紹介！</p>
         <div className='bg-gradient-to-br from-green-50 to-blue-50 p-6 rounded-xl shadow-md'>
           <p className='text-gray-700 text-center mb-4'>かわいい動物たちが待っています 🐘🦒🐧</p>
@@ -668,7 +651,7 @@ export default function CompletePage() {
         </div>
       </div>
 
-        <div className='mb-8 shadow-lg rounded-lg p-4 w-full'>
+      <div className='mb-8 shadow-lg rounded-lg p-4 w-full'>
         <h3 className='text-black text-md font-bold text-center mb-4'>✨ スタンプコレクション ✨</h3>
         <div className='grid grid-cols-5 gap-4'>
           {collectedStamps.map((id) => {
@@ -712,13 +695,13 @@ export default function CompletePage() {
           })}
         </div>
       </div>
-        <div className='flex justify-center mb-8'>
-          <Link
-            href='/'
-            className='px-8 py-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:shadow-xl active:scale-95'>
-            ホームに戻る
-          </Link>
-        </div>
+      <div className='flex justify-center mb-8'>
+        <Link
+          href='/'
+          className='px-8 py-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:shadow-xl active:scale-95'>
+          ホームに戻る
+        </Link>
+      </div>
 
       {/* 確認アラート */}
       {showConfirmation && (
@@ -737,7 +720,7 @@ export default function CompletePage() {
           </div>
         </div>
       )}
-      
+
       {/* ルーレットモーダル */}
       {showRoulette && (
         <motion.div
@@ -748,15 +731,11 @@ export default function CompletePage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className='bg-white p-8 rounded-2xl shadow-2xl max-w-lg w-full relative'>
-            <button
-              onClick={() => setShowRoulette(false)}
-              className='absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl'>
+            <button onClick={() => setShowRoulette(false)} className='absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl'>
               ✕
             </button>
             <h3 className='text-2xl font-bold text-center text-purple-600 mb-6'>🎰 エクストラボーナスルーレット 🎰</h3>
-            <RouletteWheel 
-              onSpinComplete={handleRouletteComplete} 
-            />
+            <RouletteWheel onSpinComplete={handleRouletteComplete} />
           </motion.div>
         </motion.div>
       )}
